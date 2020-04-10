@@ -61,6 +61,7 @@ rabbitmqService.createChannel(RABBITMQ_SERVER, (err, ch) => {
     channel.assertQueue(UPDATE_ARTICLE_VIDEO_SPEED_FINISH, { durable: true })
     channel.assertQueue(BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_AND_SIGNLANGUAGE, { durable: true })
     channel.assertQueue(BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_AND_SIGNLANGUAGE_FINISH, { durable: true })
+    channel.assertQueue(CONVERT_VIDEO_TO_ARTICLE_QUEUE, { durable: true });
     
     channel.consume(CONVERT_VIDEO_TO_ARTICLE_QUEUE, onConvertVideoToArticleHandler(channel), { noAck: false });
     channel.consume(EXPORT_ARTICLE_TRANSLATION, onExportArticleTranslationHandler(channel), { noAck: false });
