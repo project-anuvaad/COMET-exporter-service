@@ -5,10 +5,4 @@ WORKDIR /exporter
 COPY . .
 RUN npm install
 
-ENV GOOGLE_APPLICATION_CREDENTIALS=/exporter/gsc_creds.json
-
-# ADD AWS CREDENTIALS FILE
-RUN mkdir ~/.aws
-RUN echo ${AWS_KEYS_FILE_BASE64} | base64 --decode > ~/.aws/credentials
-
 CMD ["npm", "run", "docker:dev"]
