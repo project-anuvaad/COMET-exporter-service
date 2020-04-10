@@ -1,0 +1,30 @@
+{
+  "name": "tvw_exporter",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "pm2 start worker.js --name=tvw_exporter -i 2",
+    "stop": "pm2 stop tvw_exporter && pm2 delete tvw_exporter",
+    "dev": "node_modules/nodemon/bin/nodemon.js --ignore './tmp' worker.js",
+    "docker:dev": "npm run dev",
+    "docker:prod": "node worker.js"
+  },
+  "author": "Hassan Amin",
+  "license": "ISC",
+  "dependencies": {
+    "@videowiki/services": "^1.0.9",
+    "@videowiki/workers": "^1.0.1",
+    "amqplib": "^0.5.5",
+    "archiver": "^3.1.1",
+    "async": "^3.1.0",
+    "dotenv": "^8.0.0",
+    "rimraf": "^3.0.0",
+    "superagent": "^5.2.2",
+    "uuid": "^3.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^1.19.2"
+  }
+}
