@@ -1,7 +1,6 @@
 const {
     ARTICLE_SERVICE_API_ROOT,
     TRANSLATION_EXPORT_SERVICE_API_ROOT,
-    VIDEO_SERVICE_API_ROOT,
     USER_SERVICE_API_ROOT,
     VIDEO_SERVICE_API_ROOT,
     NOTIFICATION_SERVICE_API_ROOT,
@@ -11,7 +10,6 @@ const {
     TEXT_TO_SPEECH_SERVICE_API_ROOT,
 } = process.env;
 
-console.log('vide service', VIDEO_SERVICE_API_ROOT)
 
 const articleService = require('@videowiki/services/article')(ARTICLE_SERVICE_API_ROOT);
 const userService = require('@videowiki/services/user')(USER_SERVICE_API_ROOT);
