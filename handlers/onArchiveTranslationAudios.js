@@ -5,6 +5,7 @@ const fs = require('fs');
 const {
     storageService,
     translationExportService,
+    articleService,
 } = require('../services');
 
 const async = require('async');
@@ -20,9 +21,16 @@ const onArchiveTranslationAudios = channel => msg => {
     const tmpDirName = uuid();
     const tmpDirPath = path.join(__dirname, `../tmp/${tmpDirName}`);
     fs.mkdirSync(tmpDirPath);
-
+    let translationExport;
     translationExportService.findById(translationExportId)
-        .populate('article')
+        .then((te) => {
+            translationExport = te;
+            return articleService.findById(translationExport.article)
+        })
+        .then(article => {
+            translationExport.article = article;
+            return Promise.resolve(translationExport);
+        })
         .then((translationExport) => {
             return new Promise((resolve, reject) => {
                 // Generate audios zip file

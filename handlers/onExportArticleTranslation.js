@@ -5,6 +5,8 @@ const fs = require('fs');
 const {
     translationExportService,
     storageService,
+    videoService,
+    articleService,
 } = require('../services');
 
 const async = require('async');
@@ -29,13 +31,24 @@ const onExportArticleTranslation = channel => msg => {
     let translationExport;
 
     translationExportService.findById(translationExportId)
-        .populate('article')
-        .populate('video')
+        .then((te) => {
+            if (!te) {
+                throw new Error('Invalid translation export id')
+            }
+            translationExport = te;
+            return articleService.findById(te.article)
+        })
+        .then(a => {
+            translationExport.article = a;
+            return videoService.findById(translationExport.video)
+        })
+        .then(v => {
+            translationExport.video = v;
+            return Promise.resolve(translationExport)
+        })
         .then((a) => {
             return new Promise((resolve, reject) => {
-                if (!a) return reject(new Error('Invalid translation export id'));
                 // console.log('found article', a)
-                translationExport = a.toObject();
                 article = translationExport.article;
                 video = translationExport.video;
                 originalVideoPath = path.join(tmpDirPath, `original-video-${uuid()}.${video.url.split('.').pop()}`)

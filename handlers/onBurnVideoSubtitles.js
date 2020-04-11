@@ -2,10 +2,11 @@ const path = require('path');
 const uuid = require('uuid').v4;
 const fs = require('fs');
 
-const { 
+const {
     storageService,
     translationExportService,
     subtitlesService,
+    articleService,
 } = require('../services');
 
 const queues = require('../constants').queues;
@@ -27,17 +28,22 @@ const onGenerateVideoSubtitles = channel => msg => {
     fs.mkdirSync(tmpDirPath);
     let translationExport;
     translationExportService.findById(translationExportId)
-        .populate('article')
-        .then((translationExportDoc) => {
+        .then(te => {
+            translationExport = te
+            return articleService.findById(te.article)
+        })
+        .then(article => {
+            translationExport.article = article;
+            return Promise.resolve(translationExport)
+        })
+        .then((translationExport) => {
             return new Promise((resolve, reject) => {
-                if (!translationExportDoc) return reject(new Error('Invalid translation export id'));
-                translationExport = translationExportDoc.toObject();
                 article = translationExport.article;
                 console.log('downloading video');
                 videoPath = path.join(tmpDirPath, `video-${uuid()}.${translationExport.videoUrl.split('.').pop()}`);
                 utils.downloadFile(translationExport.videoUrl, videoPath)
-                .then(resolve)
-                .catch(reject)
+                    .then(resolve)
+                    .catch(reject)
             })
 
         })
@@ -78,10 +84,10 @@ const onGenerateVideoSubtitles = channel => msg => {
                 const outPath = path.join(tmpDirPath, `subtitled-video-${uuid()}.${videoPath.split('.').pop()}`);
                 converter.burnSubtitlesToVideo(videoPath, assSubtitlePath, outPath, {
                     onProgress: (progress) => {
-                            console.log('progressing burn', progress)
-                            if (progress) {
+                        console.log('progressing burn', progress)
+                        if (progress) {
 
-                                translationExportService.update({ _id: translationExportId }, { subtitledVideoProgress: progress })
+                            translationExportService.update({ _id: translationExportId }, { subtitledVideoProgress: progress })
                                 .then(() => {
 
                                 })

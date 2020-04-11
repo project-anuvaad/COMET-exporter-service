@@ -9,6 +9,7 @@ const converter = require('../converter');
 const {
     storageService,
     articleService,
+    videoService,
 } = require('../services');
 
 const onUpdateArticleVideoSpeed = channel => (msg) => {
@@ -30,12 +31,22 @@ const onUpdateArticleVideoSpeed = channel => (msg) => {
     // channel.ack(msg);
     console.log('=========== onUpdateArticleVideoSpeed ====================', articleId, videoSpeed)
     articleService.findById(articleId)
-        .populate('originalArticle')
-        .populate('video')
+        .then((a) => {
+            if (!a) throw new Error('Invalid article id');
+
+            article = a;
+            return articleService.findById(a.originalArticle)
+        })
+        .then(o => {
+            article.originalArticle = o;
+            return videoService.findById(article.video) 
+        })
+        .then(v => {
+            article.video = v;
+            return Promise.resolve(article);
+        })
         // Download media
-        .then(articleDoc => {
-            if (!articleDoc) throw new Error('Invalid article id');
-            article = articleDoc.toObject();
+        .then(() => {
             originalArticle = article.originalArticle;
             speedDifference = videoSpeed - 1;
             // Use original article to get fresh media

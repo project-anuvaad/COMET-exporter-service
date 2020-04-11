@@ -11,6 +11,7 @@ const {
     translationExportService,
     storageService,
     subtitlesService,
+    articleService,
 } = require('../services');
 
 const onGenerateVideoSubtitles = channel => msg => {
@@ -22,16 +23,15 @@ const onGenerateVideoSubtitles = channel => msg => {
     const tmpDirPath = path.join(__dirname, `../tmp/${tmpDirName}`);
     fs.mkdirSync(tmpDirPath);
     translationExportService.findById(translationExportId)
-        .populate('article')
-        .then((translationExportDoc) => {
-            return new Promise((resolve, reject) => {
-                // Generate audios zip file
-                if (!translationExportDoc) return reject(new Error('Invalid translation export id'));
-                translationExport = translationExportDoc.toObject();
-                article = translationExport.article;
-                return resolve()
-            })
-
+        .then(te => {
+            if (!te) throw new Error('Invalid translation export id');
+            translationExport = te;
+            return articleService.findById(te.article)    
+        })
+        .then(a => {
+            translationExport.article = a;
+            article = a;
+            return Promise.resolve(translationExport);
         })
         // Fetch subtitles doc
         .then(() => subtitlesService.find({ article: article._id })) 

@@ -6,6 +6,7 @@ const {
     storageService,
     translationExportService,
     subtitlesService,
+    articleService,
 } = require('../services');
 
 const queues = require('../constants').queues;
@@ -30,12 +31,20 @@ const onGenerateVideoSubtitles = channel => msg => {
     fs.mkdirSync(tmpDirPath);
     let translationExport;
     translationExportService.findById(translationExportId)
-        .populate('article')
-        .populate('signLanguageArticle')
-        .then((translationExportDoc) => {
+        .then(te => {
+            translationExport = te;
+            return articleService.findById(translationExport.article) 
+        })
+        .then(a => {
+            translationExport.article = article;
+            return articleService.findById(translationExport.signLanguageArticle)
+        })
+        .then(a => {
+            translationExport.signLanguageArticle = a;
+            return Promise.resolve(translationExport)
+        })
+        .then((translationExport) => {
             return new Promise((resolve, reject) => {
-                if (!translationExportDoc) return reject(new Error('Invalid translation export id'));
-                translationExport = translationExportDoc.toObject();
                 article = translationExport.article;
                 signLanguageArticle = translationExport.signLanguageArticle;
                 console.log('downloading video');
