@@ -14,7 +14,6 @@ const onConvertVideoToArticle = channel => (msg) => {
     const { videoId } = JSON.parse(msg.content.toString());
     let tmpFiles = [];
     let video;
-    let article;
     let videoPath;
     // download original video
     // cut it using the timing provided by the user

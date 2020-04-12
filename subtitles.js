@@ -24,7 +24,7 @@ function formatAssDuration(totalSeconds) {
 }
 
 function generateSubtitles(slides, subtitlePath, multiplyFactor = 1) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         const slidesSlice = slides.slice();
         const subList = [];
         slidesSlice.forEach((slide, index) => {
@@ -35,6 +35,7 @@ function generateSubtitles(slides, subtitlePath, multiplyFactor = 1) {
             let assEnd = formatAssDuration((slide.endTime * multiplyFactor));
 
             let slideText = slide.text;
+            /* eslint-disable no-useless-escape*/
             subList.push({
                 index,
                 commonsText: `${index + 1}\n${start} --> ${end}\n${slideText}`,

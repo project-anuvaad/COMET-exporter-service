@@ -9,14 +9,14 @@ const {
     textToSpeechService,
 } = require('./services')
 
-function normalizeCommandText(text) {
-    return text.replace(/\:|\'|\"/g, '');
-}
+// function normalizeCommandText(text) {
+//     return text.replace(/\:|\'|\"/g, '');
+// }
 
-function cutVideo(videoPath, targetPath, start, end, content) {
+function cutVideo(videoPath, targetPath, start, end) {
     return new Promise((resolve, reject) => {
         const command = `ffmpeg -y -ss ${utils.formatCutTime(start)} -i ${videoPath} -t ${end} ${targetPath}`;
-        exec(command, (err, stdout, stderr) => {
+        exec(command, (err) => {
             if (err) return reject(err);
             if (!fs.existsSync(targetPath)) return reject(new Error('Something went wrong'));
             return resolve(targetPath);
@@ -128,7 +128,7 @@ function cutSubslidesIntoVideos(subslides, videoPath) {
                 const targetPath = `tmp/${uuid()}-${uuid()}.${videoPath.split('.').pop()}`;
                 // const targetPath = `tmp/${index}-${uuid()}.${videoPath.split('.').pop()}`;
                 cutVideo(videoPath, targetPath, subslide.startTime, subslide.endTime - subslide.startTime)
-                    .then((res) => {
+                    .then(() => {
                         cb(null, { ...subslide, video: targetPath })
                     })
                     .catch(cb);
@@ -151,7 +151,7 @@ function cutSlidesIntoVideos(slides, videoPath) {
                     const targetPath = `tmp/${slideIndex}.${index}${uuid()}.${videoPath.split('.').pop()}`;
                     // const targetPath = `tmp/${index}-${uuid()}.${videoPath.split('.').pop()}`;
                     cutVideo(videoPath, targetPath, subslide.startTime, subslide.endTime - subslide.startTime)
-                        .then((res) => {
+                        .then(() => {
                             console.log('done', slideIndex, index); 
                             cb(null, { ...subslide, video: targetPath, slideIndex, subslideIndex: index })
                         })
@@ -219,13 +219,10 @@ function slowAudio(audioPath, targetPath, atempoRatio) {
 
 function slowAudioToDuration(audioUrl, targetDuration) {
     return new Promise((resolve, reject) => {
-        let audioDuration;
         let atempoRatio;
-        let atempos;
         utils.getRemoteFileDuration(audioUrl)
         .then((duration) => {
             if (!duration) throw new Error('Something went wrong while getting duration');
-            audioDuration = duration;
             atempoRatio = duration / targetDuration;
             const newPath = path.join(__dirname, 'tmp', `slowed_audio-${uuid()}.${audioUrl.split('.').pop()}`);
             return slowAudio(audioUrl, newPath, atempoRatio);
@@ -291,15 +288,15 @@ function addAudioToVideo(videoPath, audioPath, outPath) {
     })
 }
 
-function cutToDuration(filePath, outPath, duration) {
-    return new Promise((resolve, reject) => {
-        const command = `ffmpeg -i ${filePath} -t ${duration} ${outPath}`;
-        exec(command, (err) => {
-            if (err) return reject(err);
-            return resolve(outPath);
-        })
-    })
-}
+// function cutToDuration(filePath, outPath, duration) {
+//     return new Promise((resolve, reject) => {
+//         const command = `ffmpeg -i ${filePath} -t ${duration} ${outPath}`;
+//         exec(command, (err) => {
+//             if (err) return reject(err);
+//             return resolve(outPath);
+//         })
+//     })
+// }
 
 function overlayAudioOnVideo(videoPath, audioPath, volume, outPath) {
     return new Promise((resolve, reject) => {
@@ -364,7 +361,7 @@ function fadeAudio(filePath, type, { fadeDuration, durationType }, outPath) {
                 })
                 .catch(reject);
         } else {
-            exec(`ffmpeg -i ${filePath} -af "afade=t=${type}:st=0:d=${fadeDuration}" ${outPath}`, (err, stdout) => {
+            exec(`ffmpeg -i ${filePath} -af "afade=t=${type}:st=0:d=${fadeDuration}" ${outPath}`, (err) => {
                 if (err) return reject(err);
                 return resolve(outPath);
             })
@@ -377,7 +374,7 @@ function speedVideoSilence(videoPath, outputPath, silenceSpeed) {
         const jumpcutterPath = path.join(__dirname, 'jumpcutter', 'jumpcutter.py');
         const tmpDir = `tmpdir_${uuid()}`;
         const cmd = `python3 ${jumpcutterPath} --input_file ${videoPath} --sounded_speed 1 --silent_speed ${silenceSpeed} --output_file ${outputPath} --tmp_dir ${tmpDir}`;
-        exec(cmd, (err, stdout, stderr  ) => {
+        exec(cmd, (err) => {
             if (err) return reject(err);
             return resolve(outputPath);
         })
@@ -426,7 +423,7 @@ function combineVideos(videos, { onProgress = () => { }, onEnd = () => { } }) {
     const listName = parseInt(Date.now() + Math.random() * 100000);
     const videoPath = `tmp/${listName}.${videos[0].fileName.split('.').pop()}`;
     console.log('combinin', videos.map(v => v.fileName).join('\n'));
-    fs.writeFile(`./${listName}.txt`, videos.map((video, index) => `file '${video.fileName}'`).join('\n'), (err, content) => {
+    fs.writeFile(`./${listName}.txt`, videos.map((video) => `file '${video.fileName}'`).join('\n'), (err) => {
         if (err) {
             return onEnd(err)
         }
@@ -445,7 +442,7 @@ function combineVideos(videos, { onProgress = () => { }, onEnd = () => { } }) {
             -filter_complex "${filterComplex}concat=n=${videos.length}:v=1:a=1[outv][outa]" \
             -map "[outv]" -map "[outa]" ${videoPath}`;
             // const command = `ffmpeg -y -f concat -safe 0 -i ${listName}.txt -c copy ${videoPath}`;
-            exec(command, { maxBuffer: 1024 * 500 }, (err, stdout, stderr) => {
+            exec(command, { maxBuffer: 1024 * 500 }, (err) => {
                 console.log('command finihsed')
                 if (err) {
                     onEnd(err);
@@ -478,7 +475,7 @@ function combineAudios(audiosPaths, audioPath, { onProgress = () => { }, onEnd =
             const command = `ffmpeg ${fileNames} \
             -filter_complex "${filterComplex}concat=n=${audiosPaths.length}:v=0:a=1[outa]" \
             -map "[outa]" ${audioPath}`;
-            exec(command, (err, stdout, stderr) => {
+            exec(command, (err) => {
                 console.log('command finihsed')
                 if (err) {
                     onEnd(err);
@@ -539,14 +536,14 @@ function extendAudioDuration(audioPath, targetPath, targetDuration) {
             console.log('difference', audioDuration, targetDuration, durationDifference)
             if (durationDifference <= 0) {
                 return resolve(audioPath)
-            };
+            }
 
             return generateSilentFile(silentFilePath, durationDifference)
             .then(() => {
               return combineAudios([audioPath, silentFilePath], targetPath);
             })
             .then(() => {
-                fs.unlink(silentFilePath, (err) => {
+                fs.unlink(silentFilePath, () => {
                 })
                 resolve(targetPath)
             })
@@ -691,9 +688,9 @@ function getVideoDuration(videoPath) {
     })
 }
 
-function changeFileExtension(orignalPath, targetPath) {
+// function changeFileExtension(orignalPath, targetPath) {
 
-}
+// }
 
 
 /*

@@ -14,8 +14,6 @@ const {
 
 const onUpdateArticleVideoSpeed = channel => (msg) => {
     const { articleId, videoSpeed } = JSON.parse(msg.content.toString());
-    let tmpFiles = [];
-    let video;
     let article;
     let originalArticle;
     let videoPath;
@@ -62,7 +60,7 @@ const onUpdateArticleVideoSpeed = channel => (msg) => {
         .then((subslides) => {
             // console.log('speed difference', speedDifference, subslides)
             let prevSubslide;
-            subslides.forEach((subslide, index) => {
+            subslides.forEach((subslide) => {
                 // Background music subslides are kept unchanged
                 if (subslide.speakerProfile && subslide.speakerProfile.speakerNumber === -1) {
                     const duration = subslide.endTime - subslide.startTime;

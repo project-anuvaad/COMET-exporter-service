@@ -62,7 +62,7 @@ const onArchiveTranslationAudios = channel => msg => {
         })
         // Convert audios to mp3
         .then((allSubslides) => {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
                 const convertAudioFuncArray = [];
                 allSubslides.forEach((subslide) => {
                     console.log('file extension', utils.getFileExtension(subslide.audioPath), utils.getFileExtension(subslide.audioPath) !== 'mp3')
@@ -90,9 +90,9 @@ const onArchiveTranslationAudios = channel => msg => {
             })
         })
         .then((allSubslides) => {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
 
-                const audios = allSubslides.map((subslide, index) => ({ path: subslide.audioPath, name: subslide.name ? `${subslide.position}-${subslide.name}.${utils.getFileExtension(subslide.audioPath)}` : `${article.langCode}_${article.title}_audio_${subslide.position}.${utils.getFileExtension(subslide.audioPath)}` }));
+                const audios = allSubslides.map((subslide) => ({ path: subslide.audioPath, name: subslide.name ? `${subslide.position}-${subslide.name}.${utils.getFileExtension(subslide.audioPath)}` : `${article.langCode}_${article.title}_audio_${subslide.position}.${utils.getFileExtension(subslide.audioPath)}` }));
                 const archivePath = path.join(tmpDirPath, `${article.langCode}-${article.title}-audios-${uuid()}.zip`);
                 console.log(archivePath, audios)
                 utils.archiveFiles(audios, 'zip', archivePath)

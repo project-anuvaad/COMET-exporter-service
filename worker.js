@@ -1,7 +1,6 @@
 
 const fs = require('fs');
 
-const DB_CONNECTION_URL = process.env.DB_CONNECTION_URL;
 const RABBITMQ_SERVER = process.env.RABBITMQ_SERVER;
 
 const rabbitmqService = require('./vendors/rabbitmq');

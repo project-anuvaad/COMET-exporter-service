@@ -20,6 +20,7 @@ const onGenerateVideoSubtitles = channel => msg => {
     let article;
     let translationExport;
     const tmpDirName = uuid();
+    let subtitlesDoc
     const tmpDirPath = path.join(__dirname, `../tmp/${tmpDirName}`);
     fs.mkdirSync(tmpDirPath);
     translationExportService.findById(translationExportId)
@@ -56,7 +57,7 @@ const onGenerateVideoSubtitles = channel => msg => {
                 })
                 .catch((err) => {
                     // If that fails that's fine, proceed to videos
-                    console.log('error uploading subtitle audios');
+                    console.log('error uploading subtitle audios', err);
                     return reject();
                 })
             })
@@ -74,19 +75,19 @@ const onGenerateVideoSubtitles = channel => msg => {
         })
 }
 
-function updateTranslationExportSubtitledVideoProgress(translationExportId, subtitleProgress) {
-    translationExportService.update({ _id: translationExportId }, { subtitleProgress })
-        .then((r) => {
-            console.log('progress', subtitleProgress)
-            translationExportService.findById(subtitleProgress)
-                .then((exporitem) => {
-                    console.log(exporitem)
-                })
-        })
-        .catch(err => {
-            console.log('error updating progres', err);
-        })
-}
+// function updateTranslationExportSubtitledVideoProgress(translationExportId, subtitleProgress) {
+//     translationExportService.update({ _id: translationExportId }, { subtitleProgress })
+//         .then((r) => {
+//             console.log('progress', subtitleProgress)
+//             translationExportService.findById(subtitleProgress)
+//                 .then((exporitem) => {
+//                     console.log(exporitem)
+//                 })
+//         })
+//         .catch(err => {
+//             console.log('error updating progres', err);
+//         })
+// }
 
 
 module.exports = onGenerateVideoSubtitles;

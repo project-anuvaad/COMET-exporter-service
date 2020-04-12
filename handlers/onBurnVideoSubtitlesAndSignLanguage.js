@@ -35,7 +35,7 @@ const onGenerateVideoSubtitles = channel => msg => {
             translationExport = te;
             return articleService.findById(translationExport.article) 
         })
-        .then(a => {
+        .then(() => {
             translationExport.article = article;
             return articleService.findById(translationExport.signLanguageArticle)
         })
@@ -77,7 +77,7 @@ const onGenerateVideoSubtitles = channel => msg => {
                     })
                     .catch((err) => {
                         // If that fails that's fine, proceed to videos
-                        console.log('error uploading subtitle audios');
+                        console.log('error uploading subtitle audios', err);
                         return reject();
                     })
             })
@@ -125,7 +125,7 @@ const onGenerateVideoSubtitles = channel => msg => {
                     })
                     .catch((err) => {
                         // If that fails that's fine, proceed to videos
-                        console.log('error uploading subtitle audios');
+                        console.log('error uploading subtitle audios', err);
                         return reject();
                     })
             })

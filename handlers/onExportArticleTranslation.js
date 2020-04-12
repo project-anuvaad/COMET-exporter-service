@@ -19,10 +19,10 @@ const DEFAULT_AUDIO_FADE = { fadeDuration: 20, durationType: 'percentage' };
 const onExportArticleTranslation = channel => msg => {
     const { translationExportId } = JSON.parse(msg.content.toString());
     console.log('got request to export', translationExportId)
-    const tmpFiles = [];
+    // const tmpFiles = [];
     let article;
     let allSubslides = [];
-    let finalSubslides = [];
+    // let finalSubslides = [];
     const tmpDirName = uuid();
     const tmpDirPath = path.join(__dirname, `../${tmpDirName}`);
     let originalVideoPath = '';
@@ -46,7 +46,7 @@ const onExportArticleTranslation = channel => msg => {
             translationExport.video = v;
             return Promise.resolve(translationExport)
         })
-        .then((a) => {
+        .then(() => {
             return new Promise((resolve, reject) => {
                 // console.log('found article', a)
                 article = translationExport.article;
@@ -146,7 +146,7 @@ const onExportArticleTranslation = channel => msg => {
         })
         // increase volume of recorded audios
         .then((allSubslides) => {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
                 if (article.signLang) return resolve(allSubslides);
                 // Increase volume
                 if (!translationExport.voiceVolume || translationExport.voiceVolume === 1) return resolve(allSubslides);
@@ -180,7 +180,7 @@ const onExportArticleTranslation = channel => msg => {
         })
         // Fade in/out effects on audios
         .then((allSubslides) => {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
                 allSubslides = allSubslides.sort((a, b) => a.startTime - b.startTime);
                 if (article.signLang) return resolve(allSubslides);
 
@@ -367,7 +367,7 @@ const onExportArticleTranslation = channel => msg => {
         })
         .then((finalVideoPath) => {
             // Overlay background music if it exists
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
                 if (!video.backgroundMusicUrl) return resolve(finalVideoPath);
                 const overlayedFinalVideoPath = path.join(__dirname, `../${tmpDirName}`, `overlayed-video-${uuid()}.${finalVideoPath.split('.').pop()}`);
                 const backgroundMusicPath = path.join(__dirname, `../${tmpDirName}`, `background-music-${uuid()}.${video.backgroundMusicUrl.split('.').pop()}`);
@@ -423,14 +423,14 @@ const onExportArticleTranslation = channel => msg => {
         })
 }
 
-function updateTranslationExportProgress(translationExportId, progress) {
-    translationExportService.updateById(translationExportId, { progress })
-    .then(() => {
-        console.log('progress', progress)
-    })
-    .catch(err => {
-        console.log('error updating progres', err);
-    })
-}
+// function updateTranslationExportProgress(translationExportId, progress) {
+//     translationExportService.updateById(translationExportId, { progress })
+//     .then(() => {
+//         console.log('progress', progress)
+//     })
+//     .catch(err => {
+//         console.log('error updating progres', err);
+//     })
+// }
 
 module.exports = onExportArticleTranslation;

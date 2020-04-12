@@ -87,7 +87,7 @@ const onConvertVideoToArticle = channel => (msg) => {
                         });
                     })
                 })
-                async.parallelLimit(uploadFuncArray, 2, (err, result) => {
+                async.parallelLimit(uploadFuncArray, 2, (err) => {
                     console.log('done uploading')
                     if (err) return reject(err);
                     return resolve(slides);

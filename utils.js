@@ -2,19 +2,15 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const archiver = require('archiver');
 // silence threashold in seconds
-const SILENECE_THREASHOLD = 1;
 // slide duration threashold in seconds
 const SLIDE_THREASHOLD = 10;
 const async = require('async')
 
-function findNearestDotPosition(afterTime, items) {
-
-}
 
 function downloadFile(url, targetPath) {
     return new Promise((resolve, reject) => {
         // https://tailoredvideowiki.s3.eu-west-1.amazonaws.com/videos/1.mp4
-        exec(`curl ${url} --output ${targetPath}`, (err, stdout, stderr) => {
+        exec(`curl ${url} --output ${targetPath}`, (err) => {
             if (err) {
                 return reject(err);
             }
@@ -27,126 +23,6 @@ function downloadFile(url, targetPath) {
     })
 }
 
-function divideSpeakerSlidesByDot(slide) {
-    const itemsDuration = parseFloat(slide.items[slide.items.length - 1].end_time) - parseFloat(slide.items[0].start_time);
-    if (itemsDuration <= SLIDE_THREASHOLD) return [slide];
-    const newSlides = [];
-    slide.items.forEach((item) => {
-        item.start_time = parseFloat(item.start_time);
-        item.end_time = parseFloat(item.end_time);
-    })
-    let timeSum = slide.items[0].end_time - slide.items[0].start_time;
-    let firstItem = slide.items[0];
-    let lastItem;
-    let content = slide.items[0].alternatives[0].content;
-    slide.items.forEach((item, itemIndex) => {
-        if (item.type !== 'punctuation') {
-            timeSum += (item.end_time - item.start_time);
-        }
-        if (itemIndex === 0) return;
-        if (item.type === 'punctuation') {
-            content += `${item.alternatives[0].content}`
-        } else {
-            lastItem = item;
-            content += ` ${item.alternatives[0].content}`
-        }
-        if (item.alternatives[0].content === '.' && timeSum >= 10) {
-            newSlides.push({
-                speakerLabel: slide.speakerLabel,
-                startTime: firstItem.start_time,
-                endTime: lastItem.end_time,
-                content,
-            })
-            content = ''
-            firstItem = slide.items[itemIndex + 1];
-            timeSum = 0
-        } else if (itemIndex === (slide.items.length - 1)) {
-            newSlides.push({
-                speakerLabel: slide.speakerLabel,
-                startTime: firstItem.start_time,
-                endTime: lastItem.end_time,
-                content,
-            })
-        }
-
-    })
-
-    return newSlides;
-}
-
-function handleSlidesSilence(speakersSlides, videoDuration) {
-    const finalSlides = [...speakersSlides];
-    speakersSlides.forEach((subslides, subslideIndex) => {
-        subslides.forEach((slide, slideIndex) => {
-            if (slideIndex === 0 && subslideIndex !== 0) {
-                if (speakersSlides[subslideIndex - 1][speakersSlides[subslideIndex - 1].length - 1].endTime - slide.startTime > SLIDE_THREASHOLD) {
-                    speakersSlides[subslideIndex - 1].push({
-                        startTime: speakersSlides[subslideIndex - 1][speakersSlides[subslideIndex - 1].length - 1].endTime,
-                        endTime: slide.startTime,
-                        content: '',
-                    })
-                } else {
-                    speakersSlides[subslideIndex - 1][speakersSlides[subslideIndex - 1].length - 1].endTime = slide.startTime;
-                }
-            }
-            if (slideIndex !== 0) {
-                subslides[slideIndex - 1].endTime = slide.startTime;
-            }
-        })
-    })
-    const lastSlide = speakersSlides[speakersSlides.length - 1];
-    // if (lastItem[lastItem.length - 1].endTime !== videoDuration) {
-    // }
-    lastSlide[lastSlide.length - 1].endTime = videoDuration
-    return finalSlides;
-}
-
-// function handleSlidesSilence(speakersSlides, videoDuration) {
-//     const finalSlides = [];
-//     speakersSlides.forEach((slide, index) => {
-//         // Move the intro part to a separate slide
-//         if (index === 0 && slide.startTime > SILENECE_THREASHOLD) {
-//             finalSlides.push({ startTime: 0, endTime: slide.startTime, content: '' });
-//         }
-//         finalSlides.push(slide);
-//         // Check for silence in between and cut to separate sldies
-//         if (index !== 0 && index !== speakersSlides.length - 1) {
-//             const nextSlide = speakersSlides[index + 1];
-//             // Check for silent parts
-//             if ((nextSlide.startTime) > (slide.endTime + SILENECE_THREASHOLD)) {
-//                 // If the silent part is smaller than the slide threashold, append it to the previous slide
-//                 // Otherwise, create it as a new slide
-//                 const silenceTime = nextSlide.startTime - slide.endTime;
-//                 if (silenceTime > SLIDE_THREASHOLD) {
-//                     finalSlides.push({
-//                         startTime: slide.endTime,
-//                         endTime: nextSlide.startTime,
-//                         content: '',
-//                     })
-//                 } else {
-//                     slide.endTime = nextSlide.startTime;
-//                 }
-//             } else if (nextSlide.startTime > slide.endTime) {
-//                 slide.endTime = nextSlide.startTime;
-//             }
-//         }
-//         // Move the outro part to a separate slide
-//         if (index === speakersSlides.length - 1) {
-//             if (slide.endTime + SILENECE_THREASHOLD < videoDuration) {
-//                 finalSlides.push({
-//                     startTime: slide.endTime,
-//                     endTime: videoDuration,
-//                     content: '',
-//                 })
-//             } else {
-//                 // If outro is not large, just append it to the last slide
-//                 finalSlides[finalSlides.length - 1].endTime = videoDuration;
-//             }
-//         }
-//     })
-//     return finalSlides;
-// }
-
 function getItemContent(item) {
     if (item.type === 'pronunciation') {
         return ` ${item.alternatives[0].content}`
@@ -157,10 +33,6 @@ function getItemContent(item) {
 
 function getNearestStarTime(items) {
     return items.find((i) => i.startTime).startTime;
-}
-
-function getLatestEndTime(items) {
-    return items.reverse().find(i => i.endTime).endTime;
 }
 
 function divideSlidesIntoSubslides(slides) {
@@ -197,7 +69,7 @@ function divideSlidesIntoSubslides(slides) {
                 subSlides.push({ ...subSlide, content: subSlide.content.trim(), duration: (subSlide.endTime - subSlide.startTime) * 1000 });
                 subSlide = {
                     startTime: nextItem.startTime || 0,
-                    endTime: nextItem.endTime || startTime,
+                    endTime: nextItem.endTime,
                     content: getItemContent(nextItem),
                     speakerLabel: nextItem.speakerLabel,
                 }
@@ -212,7 +84,7 @@ function divideSlidesIntoSubslides(slides) {
     return speakersSlides;
 }
 
-function formatTranscribedSlidesToCut(slides, videoDuration = 629.88) {
+function formatTranscribedSlidesToCut(slides) {
     let finalSlides = [];
     const speakersSlides = [];
     const items = slides
