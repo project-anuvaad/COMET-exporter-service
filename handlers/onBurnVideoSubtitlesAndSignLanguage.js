@@ -35,8 +35,9 @@ const onGenerateVideoSubtitles = channel => msg => {
             translationExport = te;
             return articleService.findById(translationExport.article) 
         })
-        .then(() => {
-            translationExport.article = article;
+        .then((a) => {
+            article = a;
+            translationExport.article = a;
             return articleService.findById(translationExport.signLanguageArticle)
         })
         .then(a => {
