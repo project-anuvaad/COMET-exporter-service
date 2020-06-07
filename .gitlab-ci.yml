@@ -1,4 +1,3 @@
-
 variables:
   DOCKER_TLS_CERTDIR: ""
 
@@ -7,7 +6,8 @@ before_script:
 stages:
   - build
   - deploy
-  
+  - release
+
 build-master:
   image: docker:18-git
   stage: build
@@ -36,8 +36,24 @@ deploy-production:
     - apk upgrade -f
     - curl -o deploy.sh https://tailoredvideowiki.s3-eu-west-1.amazonaws.com/static/ci-cd/deploy.sh
     - chmod +X deploy.sh
-    - source deploy.sh $AWS_ECR_ACCOUNT_URL videowiki exporter-service 
+    - source deploy.sh $AWS_ECR_ACCOUNT_URL videowiki exporter-service
   when: manual
   only:
     - master
 
+release-version:
+  image: docker:18-git
+  stage: release
+  dependencies:
+    - build-master
+  services:
+    - docker:18-dind
+  script:
+    - apk add --update curl
+    - apk upgrade -f
+    - curl -o release.sh https://tailoredvideowiki.s3-eu-west-1.amazonaws.com/static/ci-cd/release.sh
+    - chmod +X release.sh
+    - source release.sh $AWS_ECR_ACCOUNT_URL videowiki exporter-service $RELEASE_VERSION_NUMBER
+  when: manual
+  only:
+    - master
