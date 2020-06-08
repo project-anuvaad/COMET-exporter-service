@@ -36,9 +36,9 @@ const onConvertVideoToArticle = (channel) => (msg) => {
     .then((a) => {
       if (!a || a.length === 0) throw new Error("Invalid article");
       article = a[0].toObject();
-      console.log("downloading video");
       const downloadUrl = video.compressedVideoUrl || video.url;
-      return utils.downloadFile(downloadUrl);
+      console.log("downloading video", downloadUrl);
+      return utils.downloadFile(downloadUrl, videoPath);
     })
     .then((videoPath) => {
       tmpFiles.push(videoPath);
@@ -164,4 +164,3 @@ const onConvertVideoToArticle = (channel) => (msg) => {
 };
 
 module.exports = onConvertVideoToArticle;
-
