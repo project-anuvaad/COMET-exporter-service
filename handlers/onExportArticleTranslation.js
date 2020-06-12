@@ -29,6 +29,9 @@ const onExportArticleTranslation = channel => msg => {
     fs.mkdirSync(tmpDirPath);
     let video;
     let translationExport;
+    let finalVideoPath = '';
+    let uploadedVideoUrl = '';
+    let compressedVideoUrl = '';
 
     translationExportService.findById(translationExportId)
         .then((te) => {
@@ -396,13 +399,23 @@ const onExportArticleTranslation = channel => msg => {
                 .catch(reject)
             })
         })
-        .then((finalVideoPath) => {
+        .then((vidPath) => {
+            finalVideoPath = vidPath;
             console.log('final path', finalVideoPath);
             return storageService.saveFile('translationExports', `${translationExport.dir}/${article.langCode || article.langName}_${article.title}.${finalVideoPath.split('.').pop()}`, fs.createReadStream(finalVideoPath)); 
         })
         .then(uploadRes => {
+            uploadedVideoUrl = uploadRes.url;
+            const targetPath = path.join(tmpDirPath, `compressed_video-${uuid()}.${finalVideoPath.split('.').pop()}`);
+            return converter.compressVideo(finalVideoPath, targetPath)
+        })
+        .then((compressedVidPath) => {
+            return storageService.saveFile('translationExports', `${translationExport.dir}/compressed_${article.langCode || article.langName}_${article.title}.${compressedVidPath.split('.').pop()}`, fs.createReadStream(finalVideoPath)); 
+        })
+        .then(uploadRes => {
+            compressedVideoUrl = uploadRes.url
             return new Promise((resolve, reject) => {
-                translationExportService.updateById(translationExportId, { status: 'done', progress: 100, videoUrl: uploadRes.url }).then(() => {
+                translationExportService.updateById(translationExportId, { status: 'done', progress: 100, videoUrl: uploadedVideoUrl, compressedVideoUrl: compressedVideoUrl }).then(() => {
                     channel.sendToQueue(queues.EXPORT_ARTICLE_TRANSLATION_FINISH, new Buffer(JSON.stringify({ translationExportId })), { persistent: true });
                     channel.ack(msg);
                     console.log('done')
