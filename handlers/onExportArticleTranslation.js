@@ -26,6 +26,7 @@ const onExportArticleTranslation = channel => msg => {
     const tmpDirName = uuid();
     const tmpDirPath = path.join(__dirname, `../${tmpDirName}`);
     let originalVideoPath = '';
+    let finalAudioPath = '';
     fs.mkdirSync(tmpDirPath);
     let video;
     let translationExport;
@@ -72,7 +73,7 @@ const onExportArticleTranslation = channel => msg => {
                 console.log('downloading media')
                 downloadMediaFuncArray.push((cb) => {
                     console.log('Downloading original video');
-                    const videoUrl = translationExport.article.videoSpeed && translationExport.article.videoSpeed !== 1 && translationExport.article.videoUrl ? translationExport.article.videoUrl : video.url;
+                    const videoUrl = video.url;
                     utils.downloadFile(videoUrl, originalVideoPath)
                     .then(() => {
                         return cb();
@@ -361,6 +362,38 @@ const onExportArticleTranslation = channel => msg => {
                     console.log('error normalizing audio', err);
                     return resolve(finalAudioPath);
                 })
+            })
+        })
+        // if any slide has different video speed, adjust the speed in the original video
+        .then((faudioPath) => {
+            finalAudioPath = faudioPath;
+            return new Promise((resolve) => {
+                if (allSubslides.some(s => s.videoSpeed && s.videoSpeed !== 1 && s.speakerProfile && s.speakerProfile.speakerNumber !== -1)) {
+                    const adjustVidepSpeedFuncArray = [];
+                    allSubslides.filter(s => s.videoSpeed && s.videoSpeed !== 1 && s.speakerProfile && s.speakerProfile.speakerNumber !== -1).forEach(subslide => {
+                        adjustVidepSpeedFuncArray.push(cb => {
+                            console.log('changing speed of ', subslide.slidePosition, subslide.position)
+                            let videoPath = path.join(tmpDirPath, `slowed_video_${uuid()}.${originalVideoPath.split('.').pop()}` )
+                            converter.speedVideoPart(originalVideoPath, videoPath, subslide.videoSpeed, subslide.startTime, subslide.endTime)
+                            .then(() => {
+                                originalVideoPath = videoPath;
+                                cb();
+                            })
+                            .catch(err => {
+                                console.log('error adjusting speed of ', subslide, err);
+                                cb();
+                            })
+                        })
+                    })
+                    async.series(adjustVidepSpeedFuncArray, (err) => {
+                        if (err) {
+                            console.log(err);
+                        }
+                        return resolve(finalAudioPath);
+                    })
+                } else {
+                    return resolve(finalAudioPath);
+                }
             })
         })
         // Overlay audio on video

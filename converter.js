@@ -121,14 +121,14 @@ function extractAudioFromVideo(videoPath, targetPath) {
   });
 }
 
-function cutSubslidesIntoVideos(subslides, videoPath) {
+function cutSubslidesIntoVideos(subslides, videoPath, tmpDir) {
   return new Promise((resolve, reject) => {
     const videoCuts = [];
     subslides.forEach((subslide) => {
       videoCuts.push((cb) => {
-        const targetPath = `tmp/${uuid()}-${uuid()}.${videoPath
+        const targetPath = path.join(tmpDir || 'tmp/', `${uuid()}-${uuid()}.${videoPath
           .split(".")
-          .pop()}`;
+          .pop()}`);
         // const targetPath = `tmp/${index}-${uuid()}.${videoPath.split('.').pop()}`;
         cutVideo(
           videoPath,
@@ -395,11 +395,11 @@ function fadeAudio(filePath, type, { fadeDuration, durationType }, outPath) {
           if (["in", "out"].indexOf(type) !== -1) {
             command += ` -af "afade=t=${type}:st=${
               type === "in" ? "0" : duration - finalFadeDuration
-            }:d=${finalFadeDuration}"`;
+              }:d=${finalFadeDuration}"`;
           } else if (type === "both") {
             command += ` -af "afade=t=in:st=0:d=${finalFadeDuration},afade=t=out:st=${
               duration - finalFadeDuration
-            }:d=${finalFadeDuration}"`;
+              }:d=${finalFadeDuration}"`;
           } else {
             return reject(new Error("Invalid type: in|out|both"));
           }
@@ -444,20 +444,40 @@ function speedVideo(videoPath, outputPath, speed) {
     let audioSpeedFactor;
     const speedDifference = speed - 1;
     if (speedDifference < 0) {
-      videoSpeedFactor = 1 + -speedDifference * 2;
+      videoSpeedFactor = 1 + -speedDifference ;
     } else {
       videoSpeedFactor = 1 + -speedDifference / 2;
     }
-    audioSpeedFactor = 1 + speedDifference;
+    audioSpeedFactor = 1 + speedDifference/2;
     if (audioSpeedFactor < 0.5) {
       audioSpeedFactor = 0.5;
     }
-    console.log("speed factors", videoSpeedFactor, audioSpeedFactor);
-    const cmd = `ffmpeg -i ${videoPath} -filter_complex "[0:v]setpts=${parseFloat(
+    const cmd = `ffmpeg -i ${videoPath} -filter:v "setpts=${parseFloat(
       videoSpeedFactor
-    ).toFixed(2)}*PTS[v];[0:a]atempo=${parseFloat(audioSpeedFactor).toFixed(
-      2
-    )}[a]" -map "[v]" -map "[a]" ${outputPath}`;
+    ).toFixed(2)}*PTS" ${outputPath}`;
+    // const cmd = `ffmpeg -i ${videoPath} -filter:v "setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*PTS" ${outputPath}`
+    exec(cmd, (err) => {
+      if (err) return reject(err);
+      return resolve(outputPath);
+    });
+  });
+}
+
+function speedVideoPart(videoPath, outputPath, speed, startTime, endTime){
+  return new Promise((resolve, reject) => {
+    let videoSpeedFactor;
+    let audioSpeedFactor;
+    const speedDifference = speed - 1;
+    if (speedDifference < 0) {
+      videoSpeedFactor = 1 + -speedDifference ;
+    } else {
+      videoSpeedFactor = 1 + -speedDifference / 2;
+    }
+    audioSpeedFactor = 1 + speedDifference/2;
+    if (audioSpeedFactor < 0.5) {
+      audioSpeedFactor = 0.5;
+    }
+    const cmd = `ffmpeg -y -i ${videoPath} -filter_complex "[0:v]trim=0:${startTime},setpts=PTS-STARTPTS[v1];[0:v]trim=${startTime}:${endTime},setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*(PTS-STARTPTS)[v2];[0:v]trim=${endTime},setpts=PTS-STARTPTS[v3];[v1][v2][v3]concat=n=3:v=1" -preset superfast -profile:v baseline ${outputPath}`;
     // const cmd = `ffmpeg -i ${videoPath} -filter:v "setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*PTS" ${outputPath}`
     exec(cmd, (err) => {
       if (err) return reject(err);
@@ -478,7 +498,7 @@ function getProgressFromStdout(totalDuration, chunk, onProgress) {
   }
 }
 
-function combineVideos(videos, { onProgress = () => {}, onEnd = () => {} }) {
+function combineVideos(videos, { onProgress = () => { }, onEnd = () => { } }) {
   const listName = parseInt(Date.now() + Math.random() * 100000);
   const videoPath = `tmp/${listName}.${videos[0].fileName.split(".").pop()}`;
   console.log("combinin", videos.map((v) => v.fileName).join("\n"));
@@ -517,7 +537,7 @@ function combineVideos(videos, { onProgress = () => {}, onEnd = () => {} }) {
               onEnd(null, `${videoPath}`);
             }
             // clean up
-            fs.unlink(`./${listName}.txt`, () => {});
+            fs.unlink(`./${listName}.txt`, () => { });
           }).stderr.on("data", (c) => {
             getProgressFromStdout(totalDuration, c, onProgress);
           });
@@ -530,7 +550,7 @@ function combineVideos(videos, { onProgress = () => {}, onEnd = () => {} }) {
 function combineAudios(
   audiosPaths,
   audioPath,
-  { onProgress = () => {}, onEnd = () => {} } = {}
+  { onProgress = () => { }, onEnd = () => { } } = {}
 ) {
   return new Promise((resolve, reject) => {
     console.log("combining audios", audiosPaths.join("\n"));
@@ -632,7 +652,7 @@ function extendAudioDuration(audioPath, targetPath, targetDuration) {
             return combineAudios([audioPath, silentFilePath], targetPath);
           })
           .then(() => {
-            fs.unlink(silentFilePath, () => {});
+            fs.unlink(silentFilePath, () => { });
             resolve(targetPath);
           })
           .catch(reject);
@@ -683,7 +703,7 @@ function burnSubtitlesToVideo(
   videoPath,
   subtitlePath,
   outputPath,
-  { onProgress = () => {}, onEnd = () => {} }
+  { onProgress = () => { }, onEnd = () => { } }
 ) {
   utils
     .getRemoteFileDuration(videoPath)
@@ -850,7 +870,7 @@ function overlayVideosOnVideo(videos, originalViedo, targetVideoPath) {
                 ).toFixed(3)}/TB[delayed${index + 1}]`;
                 scales += `[delayed${index + 1}]scale=(${(width * 4) / 12}):(${
                   (height * 4) / 12
-                })[overlayscaled${index + 1}]`;
+                  })[overlayscaled${index + 1}]`;
                 if (index === 0) {
                   overlays += "[0:v]";
                 } else {
@@ -859,11 +879,11 @@ function overlayVideosOnVideo(videos, originalViedo, targetVideoPath) {
 
                 overlays += `[overlayscaled${
                   index + 1
-                }]overlay=${getOverlayPositionParams(
-                  video.picInPicPosition
-                )}:enable='between(t\\,${parseFloat(video.startTime).toFixed(
-                  3
-                )},${parseFloat(video.endTime).toFixed(3)})'[outv]`;
+                  }]overlay=${getOverlayPositionParams(
+                    video.picInPicPosition
+                  )}:enable='between(t\\,${parseFloat(video.startTime).toFixed(
+                    3
+                  )},${parseFloat(video.endTime).toFixed(3)})'[outv]`;
                 if (index !== videos.length - 1) {
                   scales += ";";
                   overlays += ";";
@@ -927,4 +947,10 @@ module.exports = {
   cutSubslidesIntoVideos,
   overlayVideosOnVideo,
   compressVideo,
+  speedVideoPart,
 };
+
+// speedVideoPart('speed_test.mp4', 'speed_out.mp4', 0.5, 5, 10)
+// .then(() => {
+//   console.log('done')
+// })

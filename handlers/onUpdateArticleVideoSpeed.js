@@ -55,7 +55,7 @@ const onUpdateArticleVideoSpeed = channel => (msg) => {
             return utils.downloadFile(article.video.url, videoPath)
         })
         // Cut video to slides
-        .then(() => converter.cutSubslidesIntoVideos(subslides, videoPath))
+        .then(() => converter.cutSubslidesIntoVideos(subslides, videoPath, tmpDirPath))
         // Change start/end timings
         .then((subslides) => {
             // console.log('speed difference', speedDifference, subslides)
@@ -187,6 +187,9 @@ const onUpdateArticleVideoSpeed = channel => (msg) => {
                 slidesUpdate[`${updateField}.media.0.duration`] = subslide.endTime - subslide.startTime;
                 slidesUpdate[`${updateField}.media.0.mediaKey`] = subslide.media[0].mediaKey;
                 slidesUpdate[`${updateField}.media.0.url`] = subslide.media[0].url;
+                if (subslide.speakerProfile && subslide.speakerProfile.speakerNumber !== -1) {
+                    slidesUpdate[`${updateField}.videoSpeed`] = videoSpeed;
+                }
             })
             console.log('slide updates', slidesUpdate);
             return articleService.updateById(articleId, slidesUpdate)

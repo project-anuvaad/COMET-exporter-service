@@ -18,7 +18,9 @@ const {
     UPDATE_ARTICLE_VIDEO_SPEED_FINISH,
     BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_AND_SIGNLANGUAGE,
     BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_AND_SIGNLANGUAGE_FINISH,
-    } = queues;
+    UPDATE_ARTICLE_SLIDE_VIDEO_SPEED,
+    UPDATE_ARTICLE_SLIDE_VIDEO_SPEED_FINISH,
+} = queues;
 
 const onConvertVideoToArticleHandler = require('./handlers/onConvertVideoToArticle');
 const onExportArticleTranslationHandler = require('./handlers/onExportArticleTranslation');
@@ -28,6 +30,8 @@ const onGenerateVideoThumbnail = require('./handlers/onGenerateVideoThumbnail');
 const onBurnVideoSubtitles = require('./handlers/onBurnVideoSubtitles');
 const onUpdateArticleVideoSpeed = require('./handlers/onUpdateArticleVideoSpeed');
 const onBurnVideoSubtitlesAndSignLanguage = require('./handlers/onBurnVideoSubtitlesAndSignLanguage');
+const onUpdateArticleSlideVideoSpeed = require('./handlers/onUpdateArticleSlideVideoSpeed');
+
 const REQUIRED_DIRS = ['./tmp'];
 
 try {
@@ -39,7 +43,7 @@ try {
             fs.unlinkSync(`${dir}/*`)
         }
     })
-} catch(e) {
+} catch (e) {
     console.log(e);
 }
 
@@ -56,12 +60,17 @@ rabbitmqService.createChannel(RABBITMQ_SERVER, (err, ch) => {
     channel.assertQueue(GENERATE_VIDEO_THUMBNAIL_QUEUE, { durable: true })
     channel.assertQueue(BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE, { durable: true })
     channel.assertQueue(BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_FINISH, { durable: true })
-    channel.assertQueue(UPDATE_ARTICLE_VIDEO_SPEED, { durable: true })
-    channel.assertQueue(UPDATE_ARTICLE_VIDEO_SPEED_FINISH, { durable: true })
     channel.assertQueue(BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_AND_SIGNLANGUAGE, { durable: true })
     channel.assertQueue(BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_AND_SIGNLANGUAGE_FINISH, { durable: true })
     channel.assertQueue(CONVERT_VIDEO_TO_ARTICLE_QUEUE, { durable: true });
+
+
+    channel.assertQueue(UPDATE_ARTICLE_VIDEO_SPEED, { durable: true })
+    channel.assertQueue(UPDATE_ARTICLE_VIDEO_SPEED_FINISH, { durable: true })
     
+    channel.assertQueue(UPDATE_ARTICLE_SLIDE_VIDEO_SPEED, { durable: true })
+    channel.assertQueue(UPDATE_ARTICLE_SLIDE_VIDEO_SPEED_FINISH, { durable: true })
+
     channel.consume(CONVERT_VIDEO_TO_ARTICLE_QUEUE, onConvertVideoToArticleHandler(channel), { noAck: false });
     channel.consume(EXPORT_ARTICLE_TRANSLATION, onExportArticleTranslationHandler(channel), { noAck: false });
     channel.consume(ARCHIVE_ARTICLE_TRANSLATION_AUDIOS, onARchiveArticleTranslationsAudios(channel), { noAck: false });
@@ -69,10 +78,11 @@ rabbitmqService.createChannel(RABBITMQ_SERVER, (err, ch) => {
     channel.consume(GENERATE_VIDEO_THUMBNAIL_QUEUE, onGenerateVideoThumbnail(channel), { noAck: false });
     channel.consume(BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE, onBurnVideoSubtitles(channel), { noAck: false });
     channel.consume(UPDATE_ARTICLE_VIDEO_SPEED, onUpdateArticleVideoSpeed(channel), { noAck: false });
+    channel.consume(UPDATE_ARTICLE_SLIDE_VIDEO_SPEED, onUpdateArticleSlideVideoSpeed(channel), { noAck: false });
     channel.consume(BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_AND_SIGNLANGUAGE, onBurnVideoSubtitlesAndSignLanguage(channel), { noAck: false });
 
     // onBurnVideoSubtitlesAndSignLanguage
     setTimeout(() => {
-        // channel.sendToQueue(CONVERT_VIDEO_TO_ARTICLE_QUEUE, new Buffer(JSON.stringify({ videoId: "5d6d58e54be12b2d18b22b58", articleId: '5d6d5a1e03f9fa6cb96cc2ee' })));
+        // channel.sendToQueue(UPDATE_ARTICLE_SLIDE_VIDEO_SPEED, new Buffer(JSON.stringify({ articleId: "5ee6941f89de09003b321137", videoSpeed: 0.5, slidePosition: 0, subslidePosition: 0 })));
     }, 2000);
 })
