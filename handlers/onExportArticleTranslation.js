@@ -87,7 +87,7 @@ const onExportArticleTranslation = channel => msg => {
                         // otherwise download picInPicVideoUrl
                         if (!article.signLang) {
                             const audioPath = path.join(__dirname, `../${tmpDirName}`, `single-audio-${uuid()}-${subslide.slidePosition}-${subslide.position}.${subslide.audio.split('.').pop()}`);
-                            utils.downloadFile(subslide.audio, audioPath)
+                            utils.downloadFile( translationExport.cancelNoise && subslide.processedAudio ? subslide.processedAudio : subslide.audio, audioPath)
                             .then((audioPath) => {
                                 subslide.audioPath = audioPath;
                                 return cb()
