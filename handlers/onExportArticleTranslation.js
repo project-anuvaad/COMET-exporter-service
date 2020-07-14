@@ -443,7 +443,7 @@ const onExportArticleTranslation = channel => msg => {
             return converter.compressVideo(finalVideoPath, targetPath)
         })
         .then((compressedVidPath) => {
-            return storageService.saveFile('translationExports', `${translationExport.dir}/compressed_${article.langCode || article.langName}_${article.title}.${compressedVidPath.split('.').pop()}`, fs.createReadStream(finalVideoPath)); 
+            return storageService.saveFile('translationExports', `${translationExport.dir}/compressed_${article.langCode || article.langName}_${article.title}.${compressedVidPath.split('.').pop()}`, fs.createReadStream(compressedVidPath)); 
         })
         .then(uploadRes => {
             compressedVideoUrl = uploadRes.url
