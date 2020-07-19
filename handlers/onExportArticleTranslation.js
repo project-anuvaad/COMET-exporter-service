@@ -62,7 +62,7 @@ const onExportArticleTranslation = channel => msg => {
                     })
                 });
                 // Update status to processing
-                translationExportService.updateById(translationExportId, { status: 'processing' }).then(() => {
+                translationExportService.updateById(translationExportId, { status: 'processing', progress: 10 }).then(() => {
                 })
                 .catch(err => { console.log(err) });
 
@@ -332,6 +332,7 @@ const onExportArticleTranslation = channel => msg => {
         // Concat audios
         .then((subslides) => {
             allSubslides = subslides;
+            
             return new Promise((resolve, reject) => {
                 if (article.signLang) {
                     // extract original audio and forward it
@@ -351,6 +352,7 @@ const onExportArticleTranslation = channel => msg => {
         })
         // Normalize audio step
         .then((finalAudioPath) => {
+            translationExportService.updateById(translationExportId, { progress: 50 }).then(() => {}).catch(err => {console.log(err)})
             return new Promise((resolve) => {
                 if (!translationExport.normalizeAudio) return resolve(finalAudioPath);
                 const normalizedFinalAudioPath = path.join(tmpDirPath, `normalized-final-audio-${uuid()}.${finalAudioPath.split('.').pop()}`);
@@ -367,6 +369,7 @@ const onExportArticleTranslation = channel => msg => {
         // if any slide has different video speed, adjust the speed in the original video
         .then((faudioPath) => {
             finalAudioPath = faudioPath;
+            translationExportService.updateById(translationExportId, { progress: 60 }).then(() => {}).catch(err => {console.log(err)})
             return new Promise((resolve) => {
                 if (allSubslides.some(s => s.videoSpeed && s.videoSpeed !== 1 && s.speakerProfile && s.speakerProfile.speakerNumber !== -1)) {
                     const adjustVidepSpeedFuncArray = [];
@@ -402,6 +405,7 @@ const onExportArticleTranslation = channel => msg => {
             return converter.addAudioToVideo(originalVideoPath, finalAudioPath, finalVideoPath)
         })
         .then((finalVideoPath) => {
+            translationExportService.updateById(translationExportId, { progress: 80 }).then(() => {}).catch(err => {console.log(err)})
             // Overlay background music if it exists
             return new Promise((resolve) => {
                 if (!video.backgroundMusicUrl) return resolve(finalVideoPath);
@@ -435,14 +439,17 @@ const onExportArticleTranslation = channel => msg => {
         .then((vidPath) => {
             finalVideoPath = vidPath;
             console.log('final path', finalVideoPath);
+            translationExportService.updateById(translationExportId, { progress: 90 }).then(() => {}).catch(err => {console.log(err)})
             return storageService.saveFile('translationExports', `${translationExport.dir}/${article.langCode || article.langName}_${article.title}.${finalVideoPath.split('.').pop()}`, fs.createReadStream(finalVideoPath)); 
         })
         .then(uploadRes => {
             uploadedVideoUrl = uploadRes.url;
+            translationExportService.updateById(translationExportId, { progress: 95 }).then(() => {}).catch(err => {console.log(err)})
             const targetPath = path.join(tmpDirPath, `compressed_video-${uuid()}.${finalVideoPath.split('.').pop()}`);
             return converter.compressVideo(finalVideoPath, targetPath)
         })
         .then((compressedVidPath) => {
+            translationExportService.updateById(translationExportId, { progress: 98 }).then(() => {}).catch(err => {console.log(err)})
             return storageService.saveFile('translationExports', `${translationExport.dir}/compressed_${article.langCode || article.langName}_${article.title}.${compressedVidPath.split('.').pop()}`, fs.createReadStream(compressedVidPath)); 
         })
         .then(uploadRes => {
