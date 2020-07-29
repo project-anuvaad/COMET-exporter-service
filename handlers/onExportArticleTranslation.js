@@ -44,18 +44,26 @@ const onExportArticleTranslation = channel => msg => {
         })
         .then(a => {
             translationExport.article = a;
+            article = translationExport.article;
             return videoService.findById(translationExport.video)
         })
         .then(v => {
             translationExport.video = v;
-            return Promise.resolve(translationExport)
+            video = translationExport.video;
+            originalVideoPath = path.join(tmpDirPath, `original-video-${uuid()}.${video.url.split('.').pop()}`)
+            return new Promise((resolve, reject) => {
+                console.log('Downloading original video');
+                const videoUrl = video.url;
+                utils.downloadFile(videoUrl, originalVideoPath)
+                .then(() => {
+                    resolve()
+                })
+                .catch(reject);
+            })
         })
         .then(() => {
             return new Promise((resolve, reject) => {
                 // console.log('found article', a)
-                article = translationExport.article;
-                video = translationExport.video;
-                originalVideoPath = path.join(tmpDirPath, `original-video-${uuid()}.${video.url.split('.').pop()}`)
                 article.slides.sort((a, b) => a.positon - b.position).forEach(slide => {
                     slide.content.sort((a, b) => a.position - b.position).forEach((subslide) => {
                         allSubslides.push({ ...subslide, slidePosition: slide.position });
@@ -70,29 +78,71 @@ const onExportArticleTranslation = channel => msg => {
                 // allSubslides
                 const downloadMediaFuncArray = [];
 
-                console.log('downloading media')
-                downloadMediaFuncArray.push((cb) => {
-                    console.log('Downloading original video');
-                    const videoUrl = video.url;
-                    utils.downloadFile(videoUrl, originalVideoPath)
-                    .then(() => {
-                        return cb();
-                    })
-                    .catch(cb);
+                const newSubslides = [];
+                allSubslides.forEach((subslide, index) => {
+                    if (index === 0) {
+                        if (subslide.startTime !== 0) {
+                            newSubslides.push({
+                                startTime: 0,
+                                endTime: subslide.startTime,
+                                speakerProfile: {
+                                    speakerNumber: -1
+                                }
+                            })
+                        }
+                        newSubslides.push(subslide);
+                        if (subslide.endTime !== allSubslides[index + 1].startTime) {
+                            console.log('adding silence add silence in between audios if theres spacing') 
+                            newSubslides.push({
+                                startTime: subslide.endTime,
+                                endTime: allSubslides[index + 1].startTime,
+                                speakerProfile: {
+                                    speakerNumber: -1
+                                }
+                            })
+                        }
+                    } else if (index > 0 && index < (allSubslides.length - 1)) {
+                        if (subslide.endTime !== allSubslides[index + 1].startTime) {
+                            console.log('adding silence add silence in between audios if theres spacing') 
+                            newSubslides.push({
+                                startTime: subslide.endTime,
+                                endTime: allSubslides[index + 1].startTime,
+                                speakerProfile: {
+                                    speakerNumber: -1
+                                }
+                            })
+                        }
+                        newSubslides.push(subslide);
+                    } else {
+                        newSubslides.push(subslide);
+                    }
                 })
-
+                allSubslides = newSubslides;
+                console.log('downloading media')
                 allSubslides.forEach((subslide) => {
                     downloadMediaFuncArray.push((cb) => {
                         // if it's not a sign lang article, download audio
                         // otherwise download picInPicVideoUrl
                         if (!article.signLang) {
-                            const audioPath = path.join(__dirname, `../${tmpDirName}`, `single-audio-${uuid()}-${subslide.slidePosition}-${subslide.position}.${subslide.audio.split('.').pop()}`);
-                            utils.downloadFile( translationExport.cancelNoise && subslide.processedAudio ? subslide.processedAudio : subslide.audio, audioPath)
-                            .then((audioPath) => {
-                                subslide.audioPath = audioPath;
-                                return cb()
-                            })
-                            .catch(cb)
+                            const audioPath = path.join(__dirname, `../${tmpDirName}`, `single-audio-${uuid()}-${subslide.slidePosition}-${subslide.position}.mp3`);
+                            if (subslide.speakerProfile && subslide.speakerProfile.speakerNumber === -1) {
+                                // Extract audios from the original video
+                                const audioPath =  path.join(tmpDirPath, `original-video-${uuid()}.${video.url.split('.').pop()}`);
+                                converter.extractAudioFromVideoPart(originalVideoPath, audioPath, subslide.startTime, subslide.endTime - subslide.startTime)
+                                .then(() => {
+                                    subslide.audioPath = audioPath;
+                                    cb();
+                                })
+                                .catch(cb)
+                            } else {
+                                utils.downloadFile(translationExport.cancelNoise && subslide.processedAudio ? subslide.processedAudio : subslide.audio, audioPath)
+                                .then((audioPath) => {
+                                    subslide.audioPath = audioPath;
+                                    return cb()
+                                })
+                                .catch(cb)
+
+                            }
                         } else if (subslide.picInPicVideoUrl) {
                             const picInPicPath = path.join(__dirname, `../${tmpDirName}`, `single-picinpic-${uuid()}-${subslide.slidePosition}-${subslide.position}.${subslide.picInPicVideoUrl.split('.').pop()}`);
                             utils.downloadFile(subslide.picInPicVideoUrl, picInPicPath)
@@ -289,6 +339,8 @@ const onExportArticleTranslation = channel => msg => {
                         const targetPath = path.join(tmpDirPath, `extended-audio-${uuid()}.${subslide.audioPath.split('.').pop()}`);
                         converter.extendAudioDuration(subslide.audioPath, targetPath, parseFloat(subslide.endTime - subslide.startTime).toFixed(3))
                         .then((newPath) => {
+                            fs.unlink(subslide.audioPath, () => {
+                            })
                             subslide.audioPath = newPath;
                             cb();
                         })
@@ -309,6 +361,7 @@ const onExportArticleTranslation = channel => msg => {
                 if (article.signLang) return resolve(allSubslides);
 
                 const generateSilentAudioFuncArray = [];
+
                 allSubslides.filter((s) => s.speakerProfile && s.speakerProfile.speakerNumber === -1).forEach((subslide) => {
                     generateSilentAudioFuncArray.push((cb) => {
                         const newaudioPath = path.join(__dirname, `../${tmpDirName}`, `silent-audio-${uuid()}.${subslide.audioPath.split('.').pop()}`);
@@ -332,7 +385,7 @@ const onExportArticleTranslation = channel => msg => {
         // Concat audios
         .then((subslides) => {
             allSubslides = subslides;
-            
+            // console.log('all subslides', allSubslides) 
             return new Promise((resolve, reject) => {
                 if (article.signLang) {
                     // extract original audio and forward it
@@ -439,17 +492,17 @@ const onExportArticleTranslation = channel => msg => {
         .then((vidPath) => {
             finalVideoPath = vidPath;
             console.log('final path', finalVideoPath);
-            translationExportService.updateById(translationExportId, { progress: 90 }).then(() => {}).catch(err => {console.log(err)})
+            translationExportService.updateById(translationExportId, { progress: 80 }).then(() => {}).catch(err => {console.log(err)})
             return storageService.saveFile('translationExports', `${translationExport.dir}/${article.langCode || article.langName}_${article.title}.${finalVideoPath.split('.').pop()}`, fs.createReadStream(finalVideoPath)); 
         })
         .then(uploadRes => {
             uploadedVideoUrl = uploadRes.url;
-            translationExportService.updateById(translationExportId, { progress: 95 }).then(() => {}).catch(err => {console.log(err)})
+            translationExportService.updateById(translationExportId, { progress: 90 }).then(() => {}).catch(err => {console.log(err)})
             const targetPath = path.join(tmpDirPath, `compressed_video-${uuid()}.${finalVideoPath.split('.').pop()}`);
             return converter.compressVideo(finalVideoPath, targetPath)
         })
         .then((compressedVidPath) => {
-            translationExportService.updateById(translationExportId, { progress: 98 }).then(() => {}).catch(err => {console.log(err)})
+            translationExportService.updateById(translationExportId, { progress: 95 }).then(() => {}).catch(err => {console.log(err)})
             return storageService.saveFile('translationExports', `${translationExport.dir}/compressed_${article.langCode || article.langName}_${article.title}.${compressedVidPath.split('.').pop()}`, fs.createReadStream(compressedVidPath)); 
         })
         .then(uploadRes => {

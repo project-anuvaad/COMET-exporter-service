@@ -109,6 +109,22 @@ function extractAudioFromSlidesVideos(slides) {
   });
 }
 
+function extractAudioFromVideoPart(videoPath, targetPath, startTime, duration) {
+  return new Promise((resolve, reject) => {
+    const videoSegmentPath = `tmp/video_sgment_${uuid()}.${videoPath.split('.').pop()}`;
+    cutVideo(videoPath, videoSegmentPath, startTime, duration)
+    .then(() => {
+      return extractAudioFromVideo(videoSegmentPath, targetPath)
+    })
+    .then(() => {
+      fs.unlink(videoSegmentPath, err => {
+      })
+      return resolve(targetPath)
+    })
+    .catch(reject)
+  })
+}
+
 function extractAudioFromVideo(videoPath, targetPath) {
   return new Promise((resolve, reject) => {
     const command = `ffmpeg -y -i ${videoPath} -map 0:a:0 ${targetPath}`;
@@ -644,7 +660,11 @@ function extendAudioDuration(audioPath, targetPath, targetDuration) {
           durationDifference
         );
         if (durationDifference <= 0) {
-          return resolve(audioPath);
+          return slowAudioToDuration(audioPath, targetDuration)
+          .then((newAudioPath) => { 
+            resolve(newAudioPath)
+          })
+          .catch(reject)
         }
 
         return generateSilentFile(silentFilePath, durationDifference)
@@ -948,6 +968,7 @@ module.exports = {
   overlayVideosOnVideo,
   compressVideo,
   speedVideoPart,
+  extractAudioFromVideoPart,
 };
 
 // speedVideoPart('speed_test.mp4', 'speed_out.mp4', 0.5, 5, 10)
