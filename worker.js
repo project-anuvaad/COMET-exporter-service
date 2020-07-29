@@ -1,5 +1,6 @@
 
 const fs = require('fs');
+const { execSync } = require('child_process');
 
 const RABBITMQ_SERVER = process.env.RABBITMQ_SERVER;
 const videowikiGenerators = require('@videowiki/generators')
@@ -20,6 +21,7 @@ const {
     BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_AND_SIGNLANGUAGE_FINISH,
     UPDATE_ARTICLE_SLIDE_VIDEO_SPEED,
     UPDATE_ARTICLE_SLIDE_VIDEO_SPEED_FINISH,
+    UPDATE_ARTICLE_SLIDE_VIDEO_SLICE,
 } = queues;
 
 const onConvertVideoToArticleHandler = require('./handlers/onConvertVideoToArticle');
@@ -31,6 +33,7 @@ const onBurnVideoSubtitles = require('./handlers/onBurnVideoSubtitles');
 const onUpdateArticleVideoSpeed = require('./handlers/onUpdateArticleVideoSpeed');
 const onBurnVideoSubtitlesAndSignLanguage = require('./handlers/onBurnVideoSubtitlesAndSignLanguage');
 const onUpdateArticleSlideVideoSpeed = require('./handlers/onUpdateArticleSlideVideoSpeed');
+const onUpdateArticleSlideVideoSlice = require('./handlers/onUpdateArticleSlideVideoSlice');
 
 const REQUIRED_DIRS = ['./tmp'];
 
@@ -40,7 +43,8 @@ try {
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir)
         } else {
-            fs.unlinkSync(`${dir}/*`)
+            const r = execSync('rm -rf tmp/*')
+            console.log('cleared tmp dir', r.toJSON())
         }
     })
 } catch (e) {
@@ -79,6 +83,7 @@ rabbitmqService.createChannel(RABBITMQ_SERVER, (err, ch) => {
     channel.assertQueue(CONVERT_VIDEO_TO_ARTICLE_QUEUE, { durable: true });
 
 
+    channel.assertQueue(UPDATE_ARTICLE_SLIDE_VIDEO_SLICE, { durable: true });
     channel.assertQueue(UPDATE_ARTICLE_VIDEO_SPEED, { durable: true })
     channel.assertQueue(UPDATE_ARTICLE_VIDEO_SPEED_FINISH, { durable: true })
     
@@ -91,12 +96,13 @@ rabbitmqService.createChannel(RABBITMQ_SERVER, (err, ch) => {
     channel.consume(GENERATE_ARTICLE_TRANSLATION_VIDEO_SUBTITLE, onGenerateVideoSubtitles(channel), { noAck: false });
     channel.consume(GENERATE_VIDEO_THUMBNAIL_QUEUE, onGenerateVideoThumbnail(channel), { noAck: false });
     channel.consume(BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE, onBurnVideoSubtitles(channel), { noAck: false });
+    channel.consume(UPDATE_ARTICLE_SLIDE_VIDEO_SLICE, onUpdateArticleSlideVideoSlice(channel), { noAck: false });
     channel.consume(UPDATE_ARTICLE_VIDEO_SPEED, onUpdateArticleVideoSpeed(channel), { noAck: false });
     channel.consume(UPDATE_ARTICLE_SLIDE_VIDEO_SPEED, onUpdateArticleSlideVideoSpeed(channel), { noAck: false });
     channel.consume(BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_AND_SIGNLANGUAGE, onBurnVideoSubtitlesAndSignLanguage(channel), { noAck: false });
 
     // onBurnVideoSubtitlesAndSignLanguage
     setTimeout(() => {
-        // channel.sendToQueue(UPDATE_ARTICLE_SLIDE_VIDEO_SPEED, new Buffer(JSON.stringify({ articleId: "5ee6941f89de09003b321137", videoSpeed: 0.5, slidePosition: 0, subslidePosition: 0 })));
+        // channel.sendToQueue(UPDATE_ARTICLE_SLIDE_VIDEO_SLICE, new Buffer(JSON.stringify({ articleId: "5f20121d9ac15a001ffb1411", startTime: 1, endTime: 3, slidePosition: 0, subslidePosition: 0 })));
     }, 2000);
 })

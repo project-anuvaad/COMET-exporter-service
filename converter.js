@@ -11,11 +11,11 @@ const { textToSpeechService } = require("./services");
 //     return text.replace(/\:|\'|\"/g, '');
 // }
 
-function cutVideo(videoPath, targetPath, start, end) {
+function cutVideo(videoPath, targetPath, start, duration) {
   return new Promise((resolve, reject) => {
     const command = `ffmpeg -y -ss ${utils.formatCutTime(
       start
-    )} -i ${videoPath} -t ${end} ${targetPath}`;
+    )} -i ${videoPath} -t ${duration} ${targetPath}`;
     exec(command, (err) => {
       if (err) return reject(err);
       if (!fs.existsSync(targetPath))
