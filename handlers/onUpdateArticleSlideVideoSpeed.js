@@ -51,9 +51,8 @@ const onUpdateArticleSlideVideoSpeed = channel => (msg) => {
             // if the speed difference is +ve, then increase speed
             // if is -ve, then decrease speed
             // Speed factor is < 1 to speedup the video, and > 1 to slowdown the video
-            speedDifference = videoSpeed - 1;
             // Use original article to get fresh media
-            subslides = originalArticle.slides.slice()
+            subslides = article.slides.slice()
                 .reduce((acc, s) => s.content && s.content.length > 0 ? acc.concat(s.content.map((ss) => ({ ...ss, slidePosition: s.position, subslidePosition: ss.position }))) : acc, []).sort((a, b) => a.startTime - b.startTime);
 
             videoPath = path.join(tmpDirPath, `original-video-${uuid()}.${utils.getFileExtension(article.video.url)}`);
@@ -66,12 +65,15 @@ const onUpdateArticleSlideVideoSpeed = channel => (msg) => {
             targetSubslideIndex = subslides.findIndex(s => s.slidePosition === parseInt(slidePosition) && s.subslidePosition === parseInt(subslidePosition))
             targetSubslide = subslides[targetSubslideIndex];
 
+            speedDifference = videoSpeed - targetSubslide.videoSpeed;
+
             const duration = targetSubslide.endTime - targetSubslide.startTime;
             // get duration difference/
             // add duration difference to the end time
             // adjust the timing of the following slides and add duration difference to start and end times
             const durationDifference = (-speedDifference * duration)
             console.log('duration difference', durationDifference)
+            console.log('speed difference', speedDifference)
             targetSubslide.endTime = targetSubslide.endTime + durationDifference;
             subslides.filter((_, i) => i > targetSubslideIndex).forEach(subslide => {
                 subslide.startTime += durationDifference;
