@@ -103,7 +103,7 @@ const onExportArticleTranslation = channel => msg => {
                         }
                     } else if (index > 0 && index < (allSubslides.length - 1)) {
                         if (subslide.endTime !== allSubslides[index + 1].startTime) {
-                            console.log(subslide, allSubslides[index + 1])
+                            console.log(subslide.startTime, subslide.endTime, allSubslides[index + 1].startTime, allSubslides[index + 1].endTime)
                             console.log('adding silence add silence in between audios if theres spacing') 
                             newSubslides.push({
                                 startTime: subslide.endTime,
