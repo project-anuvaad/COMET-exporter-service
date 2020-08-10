@@ -22,6 +22,7 @@ const onExportArticleTranslation = channel => msg => {
     // const tmpFiles = [];
     let article;
     let allSubslides = [];
+    let originalSubslides = [];
     // let finalSubslides = [];
     const tmpDirName = uuid();
     const tmpDirPath = path.join(__dirname, `../${tmpDirName}`);
@@ -45,6 +46,13 @@ const onExportArticleTranslation = channel => msg => {
         .then(a => {
             translationExport.article = a;
             article = translationExport.article;
+            article.slides.sort((a, b) => a.positon - b.position).forEach(slide => {
+                slide.content.sort((a, b) => a.position - b.position).forEach((subslide) => {
+                    allSubslides.push({ ...subslide, slidePosition: slide.position, subslidePosition: subslide.position });
+                })
+            });
+            allSubslides = allSubslides.sort((a, b) => a.startTime - b.startTime).map((s,index) => ({ ...s, position: index }));
+
             return videoService.findById(translationExport.video)
         })
         .then(v => {
@@ -62,19 +70,52 @@ const onExportArticleTranslation = channel => msg => {
             })
         })
         .then(() => {
+            return articleService.findById(article.originalArticle)
+        })
+        .then(originalArticle => {
+            originalSubslides = originalArticle.slides.slice()
+                .reduce((acc, s) => s.content && s.content.length > 0 ? acc.concat(s.content.map((ss) => ({ ...ss, slidePosition: s.position, subslidePosition: ss.position }))) : acc, []).sort((a, b) => a.startTime - b.startTime);
+            return Promise.resolve();
+        })
+        // if any slide has different video speed, adjust the speed in the original video
+        .then(() => {
+            translationExportService.updateById(translationExportId, { progress: 5 }).then(() => {}).catch(err => {console.log(err)})
+            return new Promise((resolve, reject) => {
+                if (allSubslides.some(s => s.videoSpeed && s.videoSpeed !== 1 && s.speakerProfile && s.speakerProfile.speakerNumber !== -1)) {
+                    const speededSubslides = allSubslides.filter(s => s.videoSpeed && s.videoSpeed !== 1 && s.speakerProfile && s.speakerProfile.speakerNumber !== -1)
+                    let videoPath = path.join(tmpDirPath, `slowed_video_${uuid()}.${originalVideoPath.split('.').pop()}` )
+                    const finalSpeededSubslides = [];
+                    speededSubslides.forEach(s => {
+                        const originalSubslide = originalSubslides.find(ss => ss.slidePosition === s.slidePosition && ss.subslidePosition === s.subslidePosition);
+                        finalSpeededSubslides.push({
+                            startTime: originalSubslide.startTime,
+                            endTime: originalSubslide.endTime,
+                            speed: s.videoSpeed,
+                        })
+                    })
+                    console.log('final speeded', finalSpeededSubslides)
+                    converter.speedVideoAndAudioParts(originalVideoPath, videoPath, finalSpeededSubslides)
+                    .then(() => {
+                        originalVideoPath = videoPath;
+                        resolve();
+                    })
+                    .catch(err => {
+                        console.log(err)
+                        reject()
+                    })
+                } else {
+                    return resolve();
+                }
+            })
+        })
+        .then(() => {
             return new Promise((resolve, reject) => {
                 // console.log('found article', a)
-                article.slides.sort((a, b) => a.positon - b.position).forEach(slide => {
-                    slide.content.sort((a, b) => a.position - b.position).forEach((subslide) => {
-                        allSubslides.push({ ...subslide, slidePosition: slide.position });
-                    })
-                });
                 // Update status to processing
                 translationExportService.updateById(translationExportId, { status: 'processing', progress: 10 }).then(() => {
                 })
                 .catch(err => { console.log(err) });
 
-                allSubslides = allSubslides.sort((a, b) => a.startTime - b.startTime).map((s,index) => ({ ...s, position: index }));
                 // allSubslides
                 const downloadMediaFuncArray = [];
 
@@ -418,39 +459,6 @@ const onExportArticleTranslation = channel => msg => {
                     console.log('error normalizing audio', err);
                     return resolve(finalAudioPath);
                 })
-            })
-        })
-        // if any slide has different video speed, adjust the speed in the original video
-        .then((faudioPath) => {
-            finalAudioPath = faudioPath;
-            translationExportService.updateById(translationExportId, { progress: 60 }).then(() => {}).catch(err => {console.log(err)})
-            return new Promise((resolve) => {
-                if (allSubslides.some(s => s.videoSpeed && s.videoSpeed !== 1 && s.speakerProfile && s.speakerProfile.speakerNumber !== -1)) {
-                    const adjustVidepSpeedFuncArray = [];
-                    allSubslides.filter(s => s.videoSpeed && s.videoSpeed !== 1 && s.speakerProfile && s.speakerProfile.speakerNumber !== -1).forEach(subslide => {
-                        adjustVidepSpeedFuncArray.push(cb => {
-                            console.log('changing speed of ', subslide.slidePosition, subslide.position)
-                            let videoPath = path.join(tmpDirPath, `slowed_video_${uuid()}.${originalVideoPath.split('.').pop()}` )
-                            converter.speedVideoPart(originalVideoPath, videoPath, subslide.videoSpeed, subslide.startTime, subslide.endTime)
-                            .then(() => {
-                                originalVideoPath = videoPath;
-                                cb();
-                            })
-                            .catch(err => {
-                                console.log('error adjusting speed of ', subslide, err);
-                                cb();
-                            })
-                        })
-                    })
-                    async.series(adjustVidepSpeedFuncArray, (err) => {
-                        if (err) {
-                            console.log(err);
-                        }
-                        return resolve(finalAudioPath);
-                    })
-                } else {
-                    return resolve(finalAudioPath);
-                }
             })
         })
         // Overlay audio on video

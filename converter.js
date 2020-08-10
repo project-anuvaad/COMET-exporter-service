@@ -6,6 +6,7 @@ const utils = require("./utils");
 const async = require("async");
 
 const { textToSpeechService } = require("./services");
+const { getRemoteFileDuration } = require("./utils");
 
 // function normalizeCommandText(text) {
 //     return text.replace(/\:|\'|\"/g, '');
@@ -502,6 +503,120 @@ function speedVideoPart(videoPath, outputPath, speed, startTime, endTime){
   });
 }
 
+function speedVideoAndAudioPart(videoPath, outputPath, speed, startTime, endTime){
+  return new Promise((resolve, reject) => {
+    let videoSpeedFactor;
+    let audioSpeedFactor;
+    const speedDifference = speed - 1;
+    if (speedDifference < 0) {
+      videoSpeedFactor = 1 + -speedDifference ;
+    } else {
+      videoSpeedFactor = 1 + -speedDifference / 2;
+    }
+    audioSpeedFactor = 1 + speedDifference/2;
+    if (audioSpeedFactor < 0.5) {
+      audioSpeedFactor = 0.5;
+    }
+    const cmd = `ffmpeg -y -i ${videoPath} -filter_complex "[0:v]trim=0:${startTime},setpts=PTS-STARTPTS[v1];[0:v]trim=${startTime}:${endTime},setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*(PTS-STARTPTS)[v2];[0:v]trim=${endTime},setpts=PTS-STARTPTS[v3];[0:a]atrim=0:${startTime},asetpts=PTS-STARTPTS[a1];[0:a]atrim=${startTime}:${endTime},asetpts=PTS-STARTPTS,atempo=${audioSpeedFactor}[a2];[0:a]atrim=${endTime},asetpts=PTS-STARTPTS[a3];[v1][a1][v2][a2][v3][a3]concat=n=3:v=1:a=1" ${outputPath}`;
+    console.log('speeding video part')
+    console.log(cmd)
+    // const cmd = `ffmpeg -i ${videoPath} -filter:v "setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*PTS" ${outputPath}`
+    exec(cmd, (err) => {
+      if (err) return reject(err);
+      return resolve(outputPath);
+    });
+  });
+}
+
+function speedVideoAndAudioParts(videoPath, outputPath, parts) {
+  return new Promise((resolve, reject) => {
+    let cmd = `ffmpeg -y -i ${videoPath} -filter_complex "`
+    const newParts = [];
+    getRemoteFileDuration(videoPath)
+    .then(duration => {
+      parts.sort((a, b) => a.startTime - b.startTime).forEach((part, index) => {
+        if (index === 0) {
+            if (part.startTime !== 0) {
+                newParts.push({
+                    startTime: 0,
+                    endTime: part.startTime,
+                    speed: 1,
+                })
+            }
+            newParts.push(part);
+            if (parts[index + 1]) {
+              if (part.endTime !== parts[index + 1].startTime) {
+                  console.log('adding silence add silence in between audios if theres spacing') 
+                  newParts.push({
+                      startTime: part.endTime,
+                      endTime: parts[index + 1].startTime,
+                      speed: 1,
+                  })
+              }
+
+            } else if (part.endTime !== duration) {
+              newParts.push({
+                startTime: part.endTime,
+                endTime: duration,
+                speed: 1,
+              })
+            }
+        } else {
+            if (index < (parts.length - 1) && part.endTime !== parts[index + 1].startTime) {
+                newParts.push({
+                    startTime: part.endTime,
+                    endTime: parts[index + 1].startTime,
+                    speed: 1,
+                })
+            }
+            newParts.push(part);
+            if (index === parts.length - 1 && duration > part.endTime ) {
+              newParts.push({
+                startTime: part.endTime,
+                endTime: duration,
+                speed: 1,
+              })
+            }
+        }
+      })
+      console.log(newParts)
+      let videoFilter = ``
+      let audioFilter = ``
+      newParts.forEach((part, index) => {
+        const { speed, startTime, endTime } = part;
+        let videoSpeedFactor;
+        let audioSpeedFactor;
+
+        const speedDifference = speed - 1;
+        if (speedDifference < 0) {
+          videoSpeedFactor = 1 + -speedDifference ;
+        } else {
+          videoSpeedFactor = 1 + -speedDifference / 2;
+        }
+        audioSpeedFactor = 1 + speedDifference/2;
+        if (audioSpeedFactor < 0.5) {
+          audioSpeedFactor = 0.5;
+        }
+
+        videoFilter += `[0:v]trim=${startTime}:${endTime},setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*(PTS-STARTPTS)[v${index}];`
+        audioFilter += `[0:a]atrim=${startTime}:${endTime},asetpts=PTS-STARTPTS,atempo=${audioSpeedFactor}[a${index}];`
+      })
+      cmd += `${videoFilter}${audioFilter}${newParts.map((p, i) => `[v${i}][a${i}]`).join('')}concat=n=${newParts.length}:v=1:a=1" ${outputPath}`;
+
+      // const cmd = `ffmpeg -y -i ${videoPath} -filter_complex "[0:v]trim=0:${startTime},setpts=PTS-STARTPTS[v1];[0:v]trim=${startTime}:${endTime},setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*(PTS-STARTPTS)[v2];[0:v]trim=${endTime},setpts=PTS-STARTPTS[v3];[0:a]atrim=0:${startTime},asetpts=PTS-STARTPTS[a1];[0:a]atrim=${startTime}:${endTime},asetpts=PTS-STARTPTS,atempo=${audioSpeedFactor}[a2];[0:a]atrim=${endTime},asetpts=PTS-STARTPTS[a3];[v1][a1][v2][a2][v3][a3]concat=n=3:v=1:a=1" ${outputPath}`;
+      console.log('speeding video part')
+      console.log(cmd)
+      // const cmd = `ffmpeg -i ${videoPath} -filter:v "setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*PTS" ${outputPath}`
+      exec(cmd, (err) => {
+        if (err) return reject(err);
+        return resolve(outputPath);
+      });
+
+    })
+    .catch(reject)
+  })
+}
+
 function getProgressFromStdout(totalDuration, chunk, onProgress) {
   const re = /time=([0-9]+):([0-9]+):([0-9]+)/;
   const match = chunk.toString().match(re);
@@ -952,6 +1067,8 @@ module.exports = {
   slowAudioToDuration,
   matchSlidesAudioWithVideoDuration,
   // breakVideoIntoSlides,
+  speedVideoAndAudioPart,
+  speedVideoAndAudioParts,
   convertSlidesTextToSpeach,
   fadeAudio,
   burnSubtitlesToVideo,
