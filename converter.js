@@ -643,8 +643,19 @@ function extendAudioDuration(audioPath, targetPath, targetDuration) {
           targetDuration,
           durationDifference
         );
-        if (durationDifference <= 0) {
-          return resolve(audioPath);
+        // if (durationDifference <= 0) {
+        //   return resolve(audioPath);
+        // }
+
+        if (durationDifference === 0) {
+          return resolve(audioPath)
+        }
+        if (durationDifference < 0) {
+          return slowAudioToDuration(audioPath, targetDuration)
+          .then((newAudioPath) => { 
+            resolve(newAudioPath)
+          })
+          .catch(reject)
         }
 
         return generateSilentFile(silentFilePath, durationDifference)
