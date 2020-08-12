@@ -21,9 +21,8 @@ build-master:
     - curl -o build.sh https://tailoredvideowiki.s3-eu-west-1.amazonaws.com/static/ci-cd/build.sh
     - chmod +X build.sh
     - source build.sh $AWS_ECR_ACCOUNT_URL videowiki exporter-service
-  when: manual
-  # only:
-  #   - master
+  only:
+    - master
 
 deploy-production:
   image: docker:18-git
@@ -39,8 +38,8 @@ deploy-production:
     - chmod +X deploy.sh
     - source deploy.sh $AWS_ECR_ACCOUNT_URL videowiki exporter-service
   when: manual
-  # only:
-  #   - master
+  only:
+    - master
 
 release-version:
   image: docker:18-git
@@ -56,5 +55,5 @@ release-version:
     - chmod +X release.sh
     - source release.sh $AWS_ECR_ACCOUNT_URL videowiki exporter-service $RELEASE_VERSION_NUMBER
   when: manual
-  # only:
-  #   - master
+  only:
+    - master
