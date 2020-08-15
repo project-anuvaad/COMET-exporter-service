@@ -16,7 +16,7 @@ function cutVideo(videoPath, targetPath, start, duration) {
   return new Promise((resolve, reject) => {
     const command = `ffmpeg -y -ss ${utils.formatCutTime(
       start
-    )} -i ${videoPath} -t ${duration} ${targetPath}`;
+    )} -i ${videoPath} -t ${duration} -c copy ${targetPath}`;
     exec(command, (err) => {
       if (err) return reject(err);
       if (!fs.existsSync(targetPath))
