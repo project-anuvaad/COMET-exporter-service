@@ -506,19 +506,22 @@ const onExportArticleTranslation = channel => msg => {
         })
         .then(uploadRes => {
             uploadedVideoUrl = uploadRes.url;
-            translationExportService.updateById(translationExportId, { progress: 90 }).then(() => {}).catch(err => {console.log(err)})
+            // Export is technically done here, report it as done before compressing the video for later use
+            translationExportService.updateById(translationExportId, { progress: 100, status: 'done', videoUrl: uploadedVideoUrl }).then(() => {
+                channel.sendToQueue(queues.EXPORT_ARTICLE_TRANSLATION_FINISH, new Buffer(JSON.stringify({ translationExportId })), { persistent: true });
+            })
+            .catch(err => {console.log(err)})
             const targetPath = path.join(tmpDirPath, `compressed_video-${uuid()}.${finalVideoPath.split('.').pop()}`);
             return converter.compressVideo(finalVideoPath, targetPath)
         })
         .then((compressedVidPath) => {
-            translationExportService.updateById(translationExportId, { progress: 95 }).then(() => {}).catch(err => {console.log(err)})
+            console.log('done compressing', compressedVidPath)
             return storageService.saveFile('translationExports', `${translationExport.dir}/compressed_${article.langCode || article.langName}_${article.title}.${compressedVidPath.split('.').pop()}`, fs.createReadStream(compressedVidPath)); 
         })
         .then(uploadRes => {
             compressedVideoUrl = uploadRes.url
             return new Promise((resolve, reject) => {
                 translationExportService.updateById(translationExportId, { status: 'done', progress: 100, videoUrl: uploadedVideoUrl, compressedVideoUrl: compressedVideoUrl }).then(() => {
-                    channel.sendToQueue(queues.EXPORT_ARTICLE_TRANSLATION_FINISH, new Buffer(JSON.stringify({ translationExportId })), { persistent: true });
                     channel.ack(msg);
                     console.log('done')
                     return resolve()
