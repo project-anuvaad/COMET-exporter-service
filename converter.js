@@ -1045,7 +1045,7 @@ function overlayVideosOnVideo(videos, originalViedo, targetVideoPath) {
 function compressVideo(videoPath, targetPath) {
   return new Promise((resolve, reject) => {
     // By default, ffmpeg applies compression of videos
-    const cmd = `ffmpeg -i ${videoPath} ${targetPath}`;
+    const cmd = `ffmpeg -loglevel warning -i ${videoPath} ${targetPath}`;
     exec(cmd, (err) => {
       if (err) return reject(err);
       return resolve(targetPath);
