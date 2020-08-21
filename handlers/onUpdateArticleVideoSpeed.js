@@ -116,15 +116,22 @@ const onUpdateArticleVideoSpeed = channel => (msg) => {
             })
         })
         .then((subslides) => {
-            console.log('merging video');
+            console.log('speed original video');
             return new Promise((resolve, reject) => {
-                converter.combineVideos(subslides.sort((a, b) => a.startTime - b.startTime).map((s) => ({ fileName: s.video })), {
-                    onProgress: prog => console.log(prog),
-                    onEnd: (err, videoPath) => {
-                        if (err) return reject(err);
-                        return resolve({ subslides, videoPath })
-                    }
+
+                const speededVideoPath = path.join(tmpDirPath, `speeded-original-video-${uuid()}.${utils.getFileExtension(article.video.url)}`);
+                converter.speedVideo(videoPath, speededVideoPath, videoSpeed)
+                .then(() => {
+                    return resolve({ subslides, videoPath: speededVideoPath })
                 })
+                .catch(reject)
+                // converter.combineVideos(subslides.sort((a, b) => a.startTime - b.startTime).map((s) => ({ fileName: s.video })), {
+                //     onProgress: prog => console.log(prog),
+                //     onEnd: (err, videoPath) => {
+                //         if (err) return reject(err);
+                //         return resolve({ subslides, videoPath })
+                //     }
+                // })
             })
         })
         .then(({ subslides, videoPath }) => {
