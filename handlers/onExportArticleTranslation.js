@@ -379,7 +379,7 @@ const onExportArticleTranslation = channel => msg => {
                 allSubslides.forEach((subslide) => {
                     extendAudiosFuncArray.push(cb => {
                         const targetPath = path.join(tmpDirPath, `extended-audio-${uuid()}.${subslide.audioPath.split('.').pop()}`);
-                        converter.extendAudioDuration(subslide.audioPath, targetPath, parseFloat(subslide.endTime - subslide.startTime).toFixed(3))
+                        converter.extendAudioDuration(subslide.audioPath, targetPath, parseFloat(subslide.endTime - subslide.startTime).toFixed(5))
                         .then((newPath) => {
                             fs.unlink(subslide.audioPath, () => {
                             })
