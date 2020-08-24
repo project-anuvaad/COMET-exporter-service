@@ -77,8 +77,6 @@ ${asssubtitles.join('\n')}
                 break;
         }
 
-        console.log(commonsSubtitles.join('\n\n'))
-        console.log(asssubtitles.join('\n'))
         return resolve(subtitlePath);
     })
 }
