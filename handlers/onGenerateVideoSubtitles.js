@@ -15,15 +15,15 @@ const {
 } = require('../services');
 
 const onGenerateVideoSubtitles = channel => msg => {
-    const { translationExportId } = JSON.parse(msg.content.toString());
-    console.log('got request to generate subtitles', translationExportId)
+    const { id } = JSON.parse(msg.content.toString());
+    console.log('got request to generate subtitles', id)
     let article;
     let translationExport;
     const tmpDirName = uuid();
     let subtitlesDoc
     const tmpDirPath = path.join(__dirname, `../tmp/${tmpDirName}`);
     fs.mkdirSync(tmpDirPath);
-    translationExportService.findById(translationExportId)
+    translationExportService.findById(id)
         .then(te => {
             if (!te) throw new Error('Invalid translation export id');
             translationExport = te;
@@ -49,7 +49,7 @@ const onGenerateVideoSubtitles = channel => msg => {
                 const subtitleName = `${translationExport.dir || uuid()}/${article.langCode || article.langName}_${article.title}-subtitles.srt`;
                 storageService.saveFile('subtitles', subtitleName, fs.createReadStream(subtitlePath))
                 .then((uploadRes) => {
-                    return translationExportService.updateById(translationExportId, { subtitleUrl: uploadRes.url, subtitleProgress: 100 });
+                    return translationExportService.updateById(id, { subtitleUrl: uploadRes.url, subtitleProgress: 100 });
                 })
                 .then(() => {
                     console.log('done uploading')
@@ -65,18 +65,18 @@ const onGenerateVideoSubtitles = channel => msg => {
         .then(() => {
             utils.cleanupDir(tmpDirPath);
             channel.ack(msg);
-            channel.sendToQueue(queues.GENERATE_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_FINISH, new Buffer(JSON.stringify({ translationExportId })), { persistent: true });
+            channel.sendToQueue(queues.GENERATE_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_FINISH, new Buffer(JSON.stringify({ id, master: true })), { persistent: true });
         })
         .catch(err => {
             utils.cleanupDir(tmpDirPath)
             console.log(err, ' error from catch');
             channel.ack(msg);
-            translationExportService.updateById(translationExportId, { subtitledVideoProgress: 0 }).then(() => { });
+            translationExportService.updateById(id, { subtitledVideoProgress: 0 }).then(() => { });
         })
 }
 
-// function updateTranslationExportSubtitledVideoProgress(translationExportId, subtitleProgress) {
-//     translationExportService.update({ _id: translationExportId }, { subtitleProgress })
+// function updateTranslationExportSubtitledVideoProgress(id, subtitleProgress) {
+//     translationExportService.update({ _id: id }, { subtitleProgress })
 //         .then((r) => {
 //             console.log('progress', subtitleProgress)
 //             translationExportService.findById(subtitleProgress)

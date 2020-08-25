@@ -4,52 +4,48 @@ const uuid = require("uuid").v4;
 const path = require("path");
 const queues = require("../constants").queues;
 
-const { articleService, videoService, storageService } = require("../services");
+const { storageService } = require("../services");
 
 const utils = require("../utils");
 const converter = require("../converter");
 
 const onConvertVideoToArticle = (channel) => (msg) => {
-  const { videoId, articleId } = JSON.parse(msg.content.toString());
+  const { id, videoUrl, slides, speakersProfile, toEnglish } = JSON.parse(
+    msg.content.toString()
+  );
   let tmpFiles = [];
-  let video;
-  let article;
   let videoPath;
   // download original video
   // cut it using the timing provided by the user
   // cut silent parts and add them as slides
   // uploaded cutted parts
   // cleanup
+  if (!videoUrl || !id || !slides || !speakersProfile) {
+    channel.ack(msg);
+    return channel.sendToQueue(
+      queues.CONVERT_VIDEO_TO_ARTICLE_FINISH_QUEUE,
+      new Buffer(JSON.stringify({ id, status: "failed" })),
+      { persistent: true }
+    );
+  }
+  const downloadUrl = videoUrl;
+  videoPath = `${path.join(
+    __dirname,
+    "../tmp"
+  )}/${uuid()}.${utils.getFileExtension(videoUrl)}`;
 
-  videoService
-    .findById(videoId)
-    .then((v) => {
-      if (!v) throw new Error("Invalid video id");
-      console.log("converting to article", v);
-      video = v;
-      videoPath = `${path.join(
-        __dirname,
-        "../tmp"
-      )}/${uuid()}.${utils.getFileExtension(video.url)}`;
-      return articleService.find({ video: video._id, _id: articleId });
-    })
-    .then((a) => {
-      if (!a || a.length === 0) throw new Error("Invalid article");
-      article = a[0].toObject();
-      const downloadUrl = video.compressedVideoUrl || video.url;
-      console.log("downloading video", downloadUrl);
-      return utils.downloadFile(downloadUrl, videoPath);
-    })
+  utils
+    .downloadFile(downloadUrl, videoPath)
     .then((videoPath) => {
       tmpFiles.push(videoPath);
-      return converter.cutSlidesIntoVideos(article.slides.slice(), videoPath);
+      return converter.cutSlidesIntoVideos(slides.slice(), videoPath);
     })
     .then((slides) => {
-      if (article.toEnglish) {
+      if (toEnglish) {
         console.log("directly to english, generating tts slides");
         return converter.convertSlidesTextToSpeach(
           "en",
-          article.speakersProfile,
+          speakersProfile,
           slides
         );
       } else {
@@ -58,7 +54,7 @@ const onConvertVideoToArticle = (channel) => (msg) => {
     })
     .then((slides) => {
       return new Promise((resolve, reject) => {
-        if (!article.toEnglish) return resolve(slides);
+        if (!toEnglish) return resolve(slides);
         return converter
           .matchSlidesAudioWithVideoDuration(slides)
           .then(resolve)
@@ -109,7 +105,7 @@ const onConvertVideoToArticle = (channel) => (msg) => {
     .then((videoSlides) => {
       // Update slides with videos
       console.log("updating slides with video");
-      const modifiedSlides = article.slides.slice();
+      const modifiedSlides = slides.slice();
       videoSlides.forEach((videoSlide) => {
         modifiedSlides[videoSlide.slideIndex].content[
           videoSlide.subslideIndex
@@ -134,24 +130,24 @@ const onConvertVideoToArticle = (channel) => (msg) => {
           subslide.position = index;
         });
       });
-      return articleService.updateById(article._id, {
-        slides: modifiedSlides,
-        converted: true,
-      });
-    })
-    .then(() => {
-      return videoService.updateById(videoId, {
-        status: "done",
-        article: articleId,
-      });
-    })
-    .then(() => {
+      //   return articleService.updateById(article._id, {
+      //     slides: modifiedSlides,
+      //     converted: true,
+      //   });
+      // })
+      // .then(() => {
+      //   return videoService.updateById(videoId, {
+      //     status: "done",
+      //     article: articleId,
+      //   });
+      // })
+      // .then(() => {
       console.log("done");
       utils.cleanupFiles(tmpFiles);
       channel.ack(msg);
       channel.sendToQueue(
         queues.CONVERT_VIDEO_TO_ARTICLE_FINISH_QUEUE,
-        new Buffer(JSON.stringify({ videoId, articleId })),
+        new Buffer(JSON.stringify({ id, slides: modifiedSlides })),
         { persistent: true }
       );
     })
@@ -159,7 +155,11 @@ const onConvertVideoToArticle = (channel) => (msg) => {
       console.log(err);
       utils.cleanupFiles(tmpFiles);
       channel.ack(msg);
-      return videoService.updateById(videoId, { status: "failed" });
+      channel.sendToQueue(
+        queues.CONVERT_VIDEO_TO_ARTICLE_FINISH_QUEUE,
+        new Buffer(JSON.stringify({ id, status: "failed" })),
+        { persistent: true }
+      );
     });
 };
 

@@ -3,10 +3,7 @@ const uuid = require('uuid').v4;
 const fs = require('fs');
 
 const {
-    translationExportService,
     storageService,
-    videoService,
-    articleService,
 } = require('../services');
 
 const async = require('async');
@@ -17,8 +14,26 @@ const converter = require('../converter');
 const DEFAULT_AUDIO_FADE = { fadeDuration: 20, durationType: 'percentage' };
 
 const onExportArticleTranslation = channel => msg => {
-    const { translationExportId } = JSON.parse(msg.content.toString());
-    console.log('got request to export', translationExportId)
+    const { 
+        id,
+        cancelNoise,
+        voiceVolume,
+        normalizeAudio,
+        backgroundMusicVolume,
+        dir,
+        slides,
+        originalSlides,
+        signLang,
+        langCode,
+        langName,
+        title,
+        videoUrl,  
+        backgroundMusicUrl,
+    } = JSON.parse(msg.content.toString());
+    console.log('got request to export', id)
+    if (!videoUrl || !id) {
+        return channel.ack(msg)
+    }
     // const tmpFiles = [];
     let article;
     let allSubslides = [];
@@ -34,52 +49,64 @@ const onExportArticleTranslation = channel => msg => {
     let finalVideoPath = '';
     let uploadedVideoUrl = '';
     let compressedVideoUrl = '';
+    originalVideoPath = path.join(tmpDirPath, `original-video-${uuid()}.${videoUrl.split('.').pop()}`)
+    slides.sort((a, b) => a.positon - b.position).forEach(slide => {
+        slide.content.sort((a, b) => a.position - b.position).forEach((subslide) => {
+            allSubslides.push({ ...subslide, slidePosition: slide.position, subslidePosition: subslide.position });
+        })
+    });
+    allSubslides = allSubslides.sort((a, b) => a.startTime - b.startTime).map((s,index) => ({ ...s, position: index }));
 
-    translationExportService.findById(translationExportId)
-        .then((te) => {
-            if (!te) {
-                throw new Error('Invalid translation export id')
-            }
-            translationExport = te;
-            return articleService.findById(te.article)
-        })
-        .then(a => {
-            translationExport.article = a;
-            article = translationExport.article;
-            article.slides.sort((a, b) => a.positon - b.position).forEach(slide => {
-                slide.content.sort((a, b) => a.position - b.position).forEach((subslide) => {
-                    allSubslides.push({ ...subslide, slidePosition: slide.position, subslidePosition: subslide.position });
-                })
-            });
-            allSubslides = allSubslides.sort((a, b) => a.startTime - b.startTime).map((s,index) => ({ ...s, position: index }));
 
-            return videoService.findById(translationExport.video)
-        })
-        .then(v => {
-            translationExport.video = v;
-            video = translationExport.video;
-            originalVideoPath = path.join(tmpDirPath, `original-video-${uuid()}.${video.url.split('.').pop()}`)
-            return new Promise((resolve, reject) => {
-                console.log('Downloading original video');
-                const videoUrl = video.url;
-                utils.downloadFile(videoUrl, originalVideoPath)
-                .then(() => {
-                    resolve()
-                })
-                .catch(reject);
-            })
-        })
-        .then(() => {
-            return articleService.findById(article.originalArticle)
-        })
-        .then(originalArticle => {
-            originalSubslides = originalArticle.slides.slice()
-                .reduce((acc, s) => s.content && s.content.length > 0 ? acc.concat(s.content.map((ss) => ({ ...ss, slidePosition: s.position, subslidePosition: ss.position }))) : acc, []).sort((a, b) => a.startTime - b.startTime);
-            return Promise.resolve();
-        })
+    originalSubslides = originalSlides.slice()
+        .reduce((acc, s) => s.content && s.content.length > 0 ? acc.concat(s.content.map((ss) => ({ ...ss, slidePosition: s.position, subslidePosition: ss.position }))) : acc, []).sort((a, b) => a.startTime - b.startTime);
+    // translationExportService.findById(id)
+    //     .then((te) => {
+    //         if (!te) {
+    //             throw new Error('Invalid translation export id')
+    //         }
+    //         translationExport = te;
+    //         return articleService.findById(te.article)
+    //     })
+    //     .then(a => {
+    //         translationExport.article = a;
+    //         article = translationExport.article;
+    //         slides.sort((a, b) => a.positon - b.position).forEach(slide => {
+    //             slide.content.sort((a, b) => a.position - b.position).forEach((subslide) => {
+    //                 allSubslides.push({ ...subslide, slidePosition: slide.position, subslidePosition: subslide.position });
+    //             })
+    //         });
+    //         allSubslides = allSubslides.sort((a, b) => a.startTime - b.startTime).map((s,index) => ({ ...s, position: index }));
+
+    //         return videoService.findById(translationExport.video)
+    //     })
+    //     .then(v => {
+    //         translationExport.video = v;
+    //         video = translationExport.video;
+    //         originalVideoPath = path.join(tmpDirPath, `original-video-${uuid()}.${videoUrl.split('.').pop()}`)
+    //         return new Promise((resolve, reject) => {
+    //             console.log('Downloading original video');
+    //             const videoUrl = videoUrl;
+    //             utils.downloadFile(videoUrl, originalVideoPath)
+    //             .then(() => {
+    //                 resolve()
+    //             })
+    //             .catch(reject);
+    //         })
+    //     })
+        utils.downloadFile(videoUrl, originalVideoPath)
+        // .then(() => {
+        //     return articleService.findById(article.originalArticle)
+        // })
+        // .then(originalArticle => {
+        //     originalSubslides = originalSlides.slice()
+        //         .reduce((acc, s) => s.content && s.content.length > 0 ? acc.concat(s.content.map((ss) => ({ ...ss, slidePosition: s.position, subslidePosition: ss.position }))) : acc, []).sort((a, b) => a.startTime - b.startTime);
+        //     return Promise.resolve();
+        // })
         // if any slide has different video speed, adjust the speed in the original video
         .then(() => {
-            translationExportService.updateById(translationExportId, { progress: 5 }).then(() => {}).catch(err => {console.log(err)})
+            updateTranslationExportProgress(channel, id, 5)
+
             return new Promise((resolve, reject) => {
                 if (allSubslides.some(s => s.videoSpeed && s.videoSpeed !== 1 && s.speakerProfile && s.speakerProfile.speakerNumber !== -1)) {
                     const speededSubslides = allSubslides.filter(s => s.videoSpeed && s.videoSpeed !== 1 && s.speakerProfile && s.speakerProfile.speakerNumber !== -1)
@@ -112,10 +139,7 @@ const onExportArticleTranslation = channel => msg => {
             return new Promise((resolve, reject) => {
                 // console.log('found article', a)
                 // Update status to processing
-                translationExportService.updateById(translationExportId, { status: 'processing', progress: 10 }).then(() => {
-                })
-                .catch(err => { console.log(err) });
-
+                updateTranslationExportProgress(channel, id, 10)
                 // allSubslides
                 const downloadMediaFuncArray = [];
 
@@ -165,11 +189,11 @@ const onExportArticleTranslation = channel => msg => {
                     downloadMediaFuncArray.push((cb) => {
                         // if it's not a sign lang article, download audio
                         // otherwise download picInPicVideoUrl
-                        if (!article.signLang) {
+                        if (!signLang) {
                             const audioPath = path.join(__dirname, `../${tmpDirName}`, `single-audio-${uuid()}-${subslide.slidePosition}-${subslide.position}.mp3`);
                             if (subslide.speakerProfile && subslide.speakerProfile.speakerNumber === -1) {
                                 // Extract audios from the original video
-                                const audioPath =  path.join(tmpDirPath, `original-video-${uuid()}.${video.url.split('.').pop()}`);
+                                const audioPath =  path.join(tmpDirPath, `original-video-${uuid()}.${videoUrl.split('.').pop()}`);
                                 converter.extractAudioFromVideoPart(originalVideoPath, audioPath, subslide.startTime, subslide.endTime - subslide.startTime)
                                 .then(() => {
                                     subslide.audioPath = audioPath;
@@ -177,7 +201,7 @@ const onExportArticleTranslation = channel => msg => {
                                 })
                                 .catch(cb)
                             } else {
-                                utils.downloadFile(translationExport.cancelNoise && subslide.processedAudio ? subslide.processedAudio : subslide.audio, audioPath)
+                                utils.downloadFile(cancelNoise && subslide.processedAudio ? subslide.processedAudio : subslide.audio, audioPath)
                                 .then((audioPath) => {
                                     subslide.audioPath = audioPath;
                                     return cb()
@@ -210,7 +234,7 @@ const onExportArticleTranslation = channel => msg => {
         .then(allSubslides => {
             return new Promise((resolve, reject) => {
                 // Skip convrint audio for signLang
-                if (article.signLang) return resolve(allSubslides);
+                if (signLang) return resolve(allSubslides);
 
                 const addAudioFuncArray = [];
                 allSubslides.forEach((subslide) => {
@@ -243,17 +267,17 @@ const onExportArticleTranslation = channel => msg => {
         // increase volume of recorded audios
         .then((allSubslides) => {
             return new Promise((resolve) => {
-                if (article.signLang) return resolve(allSubslides);
+                if (signLang) return resolve(allSubslides);
                 // Increase volume
-                if (!translationExport.voiceVolume || translationExport.voiceVolume === 1) return resolve(allSubslides);
+                if (!voiceVolume || voiceVolume === 1) return resolve(allSubslides);
                 const increaseVolumeFuncArray = [];
                 allSubslides.forEach((subslide) => {
                     if (subslide.speakerProfile && subslide.speakerProfile.speakerNumber !== -1) {
                         increaseVolumeFuncArray.push(cb => {
                             const targetPath = path.join(__dirname, `../${tmpDirName}`, `increaseVolume-audio-${uuid()}.${subslide.audioPath.split('.').pop()}`);
-                            converter.changeAudioVolume(subslide.audioPath, targetPath, translationExport.voiceVolume)
+                            converter.changeAudioVolume(subslide.audioPath, targetPath, voiceVolume)
                             .then((outPath) => {
-                                console.log('increase volume to ', translationExport.voiceVolume)
+                                console.log('increase volume to ', voiceVolume)
                                 subslide.audioPath = outPath;
                                 cb();
                             })
@@ -278,7 +302,7 @@ const onExportArticleTranslation = channel => msg => {
         .then((allSubslides) => {
             return new Promise((resolve) => {
                 allSubslides = allSubslides.sort((a, b) => a.startTime - b.startTime);
-                if (article.signLang) return resolve(allSubslides);
+                if (signLang) return resolve(allSubslides);
 
                 const firstTranslationSlideIndex = allSubslides.findIndex((s) => s.speakerProfile.speakerNumber !== -1);
                 const lastTranslationSlideIndex = (allSubslides.length - 1) - allSubslides.slice().reverse().findIndex((s) => s.speakerProfile.speakerNumber !== -1);
@@ -324,7 +348,7 @@ const onExportArticleTranslation = channel => msg => {
                 })
                 */
                 // Fade in all background music slides
-                if (!video.backgroundMusicUrl) {
+                if (!backgroundMusicUrl) {
                     backgroundMusicSlidesIndexes.forEach((subslideIndex) => {
                         fadevideoFuncArray.push((cb) => {
                             const subslide = allSubslides[subslideIndex];
@@ -374,7 +398,7 @@ const onExportArticleTranslation = channel => msg => {
         // Extend audios to videos durations and combine into one file
         .then(allSubslides => {
             return new Promise((resolve, reject) => {
-                if (article.signLang) return resolve(allSubslides);
+                if (signLang) return resolve(allSubslides);
                 const extendAudiosFuncArray = [];
                 allSubslides.forEach((subslide) => {
                     extendAudiosFuncArray.push(cb => {
@@ -399,8 +423,8 @@ const onExportArticleTranslation = channel => msg => {
         // Convert background music slides to silent audios if the video already have backgroundMusicUrl
         .then((allSubslides) => {
             return new Promise((resolve) => {
-                if (!video.backgroundMusicUrl) return resolve(allSubslides);
-                if (article.signLang) return resolve(allSubslides);
+                if (!backgroundMusicUrl) return resolve(allSubslides);
+                if (signLang) return resolve(allSubslides);
 
                 const generateSilentAudioFuncArray = [];
 
@@ -429,7 +453,7 @@ const onExportArticleTranslation = channel => msg => {
             allSubslides = subslides;
             // console.log('all subslides', allSubslides) 
             return new Promise((resolve, reject) => {
-                if (article.signLang) {
+                if (signLang) {
                     // extract original audio and forward it
                     const originalAudioPath = path.join(tmpDirPath, `original-audio-${uuid()}.mp3`)
                     converter.extractAudioFromVideo(originalVideoPath, originalAudioPath)
@@ -447,9 +471,9 @@ const onExportArticleTranslation = channel => msg => {
         })
         // Normalize audio step
         .then((finalAudioPath) => {
-            translationExportService.updateById(translationExportId, { progress: 50 }).then(() => {}).catch(err => {console.log(err)})
+            updateTranslationExportProgress(channel, id, 50)
             return new Promise((resolve) => {
-                if (!translationExport.normalizeAudio) return resolve(finalAudioPath);
+                if (!normalizeAudio) return resolve(finalAudioPath);
                 const normalizedFinalAudioPath = path.join(tmpDirPath, `normalized-final-audio-${uuid()}.${finalAudioPath.split('.').pop()}`);
                 converter.normalizeAudio(finalAudioPath, normalizedFinalAudioPath)
                 .then(() => {
@@ -463,19 +487,19 @@ const onExportArticleTranslation = channel => msg => {
         })
         // Overlay audio on video
         .then((finalAudioPath) => {
-            const finalVideoPath = path.join(tmpDirPath, `final-video-${uuid()}.${video.url.split('.').pop()}`)
+            const finalVideoPath = path.join(tmpDirPath, `final-video-${uuid()}.${videoUrl.split('.').pop()}`)
             return converter.addAudioToVideo(originalVideoPath, finalAudioPath, finalVideoPath)
         })
         .then((finalVideoPath) => {
-            translationExportService.updateById(translationExportId, { progress: 80 }).then(() => {}).catch(err => {console.log(err)})
+            updateTranslationExportProgress(channel, id, 80)
             // Overlay background music if it exists
             return new Promise((resolve) => {
-                if (!video.backgroundMusicUrl) return resolve(finalVideoPath);
+                if (!backgroundMusicUrl) return resolve(finalVideoPath);
                 const overlayedFinalVideoPath = path.join(__dirname, `../${tmpDirName}`, `overlayed-video-${uuid()}.${finalVideoPath.split('.').pop()}`);
-                const backgroundMusicPath = path.join(__dirname, `../${tmpDirName}`, `background-music-${uuid()}.${video.backgroundMusicUrl.split('.').pop()}`);
-                utils.downloadFile(video.backgroundMusicUrl, backgroundMusicPath)
+                const backgroundMusicPath = path.join(__dirname, `../${tmpDirName}`, `background-music-${uuid()}.${backgroundMusicUrl.split('.').pop()}`);
+                utils.downloadFile(backgroundMusicUrl, backgroundMusicPath)
                 .then(() => {
-                    return converter.overlayAudioOnVideo(finalVideoPath, backgroundMusicPath, translationExport.backgroundMusicVolume || 1, overlayedFinalVideoPath)
+                    return converter.overlayAudioOnVideo(finalVideoPath, backgroundMusicPath, backgroundMusicVolume || 1, overlayedFinalVideoPath)
                 })
                 .then(() => {
                     return resolve(overlayedFinalVideoPath);
@@ -488,7 +512,7 @@ const onExportArticleTranslation = channel => msg => {
         })
         .then(finalVideoPath => {
             return new Promise((resolve, reject) => {
-                if (!article.signLang) {
+                if (!signLang) {
                     return resolve(finalVideoPath);
                 }
                 // if its sign language, burn video sign picInPic to video slide
@@ -500,55 +524,37 @@ const onExportArticleTranslation = channel => msg => {
         })
         .then((vidPath) => {
             finalVideoPath = vidPath;
-            console.log('final path', finalVideoPath);
-            translationExportService.updateById(translationExportId, { progress: 80 }).then(() => {}).catch(err => {console.log(err)})
-            return storageService.saveFile('translationExports', `${translationExport.dir}/${article.langCode || article.langName}_${article.title}.${finalVideoPath.split('.').pop()}`, fs.createReadStream(finalVideoPath)); 
+            updateTranslationExportProgress(channel, id, 90)
+            return storageService.saveFile('translationExports', `${dir}/${langCode || langName}_${title}.${finalVideoPath.split('.').pop()}`, fs.createReadStream(finalVideoPath)); 
         })
         .then(uploadRes => {
             uploadedVideoUrl = uploadRes.url;
             // Export is technically done here, report it as done before compressing the video for later use
-            translationExportService.updateById(translationExportId, { progress: 100, status: 'done', videoUrl: uploadedVideoUrl }).then(() => {
-                channel.sendToQueue(queues.EXPORT_ARTICLE_TRANSLATION_FINISH, new Buffer(JSON.stringify({ translationExportId })), { persistent: true });
-            })
-            .catch(err => {console.log(err)})
+            channel.sendToQueue(queues.EXPORT_ARTICLE_TRANSLATION_FINISH, new Buffer(JSON.stringify({ id, url: uploadedVideoUrl })), { persistent: true });
             const targetPath = path.join(tmpDirPath, `compressed_video-${uuid()}.${finalVideoPath.split('.').pop()}`);
             return converter.compressVideo(finalVideoPath, targetPath)
         })
         .then((compressedVidPath) => {
-            console.log('done compressing', compressedVidPath)
-            return storageService.saveFile('translationExports', `${translationExport.dir}/compressed_${article.langCode || article.langName}_${article.title}.${compressedVidPath.split('.').pop()}`, fs.createReadStream(compressedVidPath)); 
+            console.log('done compressing')
+            return storageService.saveFile('translationExports', `${dir}/compressed_${langCode || langName}_${title}.${compressedVidPath.split('.').pop()}`, fs.createReadStream(compressedVidPath)); 
         })
-        .then(uploadRes => {
+        .then((uploadRes) => {
             compressedVideoUrl = uploadRes.url
-            return new Promise((resolve, reject) => {
-                translationExportService.updateById(translationExportId, { status: 'done', progress: 100, videoUrl: uploadedVideoUrl, compressedVideoUrl: compressedVideoUrl }).then(() => {
-                    channel.ack(msg);
-                    console.log('done')
-                    return resolve()
-                })
-                .catch(reject);
-            })
-        })
-        .then(() => {
+            channel.sendToQueue(queues.EXPORT_ARTICLE_TRANSLATION_COMPRESSION_FINISH, new Buffer(JSON.stringify({ id, url: compressedVideoUrl })), { persistent: true });
+            console.log('done')
             utils.cleanupDir(path.join(__dirname, `../${tmpDirName}`))
+            channel.ack(msg);
         })
         .catch(err => {
             utils.cleanupDir(path.join(__dirname, `../${tmpDirName}`))
             console.log(err,' error from catch');
             channel.ack(msg);
-            translationExportService.updateById(translationExportId, { status: 'failed' }).then(() => {});
-            channel.sendToQueue(queues.EXPORT_ARTICLE_TRANSLATION_FINISH, new Buffer(JSON.stringify({ translationExportId })), { persistent: true });
+            channel.sendToQueue(queues.EXPORT_ARTICLE_TRANSLATION_FINISH, new Buffer(JSON.stringify({ id, status: 'failed' })), { persistent: true });
         })
 }
 
-// function updateTranslationExportProgress(translationExportId, progress) {
-//     translationExportService.updateById(translationExportId, { progress })
-//     .then(() => {
-//         console.log('progress', progress)
-//     })
-//     .catch(err => {
-//         console.log('error updating progres', err);
-//     })
-// }
+function updateTranslationExportProgress(channel, id, progress) {
+    channel.sendToQueue(queues.EXPORT_ARTICLE_TRANSLATION_PROGRESS, new Buffer(JSON.stringify({ id, progress })), { persistent: true });
+}
 
 module.exports = onExportArticleTranslation;

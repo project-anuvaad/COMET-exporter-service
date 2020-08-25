@@ -32,7 +32,7 @@ const onGenerateVideoSubtitles = channel => msg => {
                 const subtitleName = `${dir || uuid()}/${langCode || langName}_${title}-subtitles.srt`;
                 storageService.saveFile('subtitles', subtitleName, fs.createReadStream(subtitlePath))
                     .then((uploadRes) => {
-                        updateTranslationExportSubtitleProgress(channel, { id, url: uploadRes.url })
+                        updateTranslationExportSubtitleFinish(channel, { id, url: uploadRes.url })
                         resolve();
                     })
                     .catch((err) => {
@@ -92,7 +92,7 @@ const onGenerateVideoSubtitles = channel => msg => {
         })
 }
 
-function updateTranslationExportSubtitleProgress(channel, params) {
+function updateTranslationExportSubtitleFinish(channel, params) {
     channel.sendToQueue(queues.GENERATE_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_FINISH, new Buffer(JSON.stringify(params)), { persistent: true });
 }
 
