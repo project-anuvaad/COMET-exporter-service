@@ -5,10 +5,11 @@ const path = require("path");
 const utils = require("../utils");
 const converter = require("../converter");
 
-const { storageService, videoService } = require("../services");
+const { storageService } = require("../services");
+const { queues } = require("../constants");
 
 const onConvertVideoToArticle = (channel) => (msg) => {
-  const { videoId } = JSON.parse(msg.content.toString());
+  const { id, videoUrl } = JSON.parse(msg.content.toString());
   let tmpFiles = [];
   let video;
   let videoPath;
@@ -17,30 +18,24 @@ const onConvertVideoToArticle = (channel) => (msg) => {
   // cut silent parts and add them as slides
   // uploaded cutted parts
   // cleanup
+  if (!videoUrl) return channel.ack(msg)
   let thumbnailPath = `${path.join(
     __dirname,
     "../tmp"
   )}/thumbnail-${uuid()}.png`;
   let compressedVideoPath;
 
-  videoService
-    .findById(videoId)
-    .then((v) => {
-      if (!v) throw new Error("Invalid video id");
-      console.log("Generating thumbnail for vidoe", v);
-      video = v;
-      videoPath = `${path.join(
-        __dirname,
-        "../tmp"
-      )}/${uuid()}.${utils.getFileExtension(video.url)}`;
+  videoPath = `${path.join(
+    __dirname,
+    "../tmp"
+  )}/${uuid()}.${utils.getFileExtension(videoUrl)}`;
 
-      compressedVideoPath = `${path.join(
-        __dirname,
-        "../tmp"
-      )}/compressed_${uuid()}.${utils.getFileExtension(video.url)}`;
-
-      return utils.downloadFile(video.url, videoPath);
-    })
+  compressedVideoPath = `${path.join(
+    __dirname,
+    "../tmp"
+  )}/compressed_${uuid()}.${utils.getFileExtension(videoUrl)}`;
+  utils
+    .downloadFile(videoUrl, videoPath)
     // Generate thumbnil image
     .then((videoPath) => {
       tmpFiles.push(videoPath);
@@ -65,7 +60,8 @@ const onConvertVideoToArticle = (channel) => (msg) => {
       );
     })
     .then((uploadRes) => {
-      return videoService.updateById(videoId, { thumbnailUrl: uploadRes.url });
+      channel.sendToQueue(queues.GENERATE_VIDEO_THUMBNAIL_FINISH, new Buffer(JSON.stringify({ id, url: uploadRes.url })), { persistent: true });
+      return Promise.resolve();
     })
     .then(() => {
       return storageService.saveFile(
@@ -75,9 +71,8 @@ const onConvertVideoToArticle = (channel) => (msg) => {
       );
     })
     .then((uploadRes) => {
-      return videoService.updateById(videoId, {
-        compressedVideoUrl: uploadRes.url,
-      });
+      channel.sendToQueue(queues.COMPRESS_VIDEO_FINISH, new Buffer(JSON.stringify({ id, url: uploadRes.url })), { persistent: true });
+      return Promise.resolve();
     })
     .then(() => {
       console.log("done");
