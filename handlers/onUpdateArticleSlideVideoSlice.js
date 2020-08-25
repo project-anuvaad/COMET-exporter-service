@@ -6,7 +6,7 @@ const path = require("path");
 const utils = require("../utils");
 const converter = require("../converter");
 
-const { storageService, articleService, videoService } = require("../services");
+const { storageService } = require("../services");
 const { queues } = require("../constants");
 
 const onUpdateArticleSlideVideoSlice = (channel) => (msg) => {
