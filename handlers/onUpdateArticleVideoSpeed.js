@@ -9,13 +9,11 @@ const converter = require('../converter');
 const {
     storageService,
     articleService,
-    videoService,
 } = require('../services');
+const { queues } = require('../constants');
 
 const onUpdateArticleVideoSpeed = channel => (msg) => {
-    const { articleId, videoSpeed } = JSON.parse(msg.content.toString());
-    let article;
-    let originalArticle;
+    const { id, videoUrl, originalSlides, videoSpeed } = JSON.parse(msg.content.toString());
     let videoPath;
     let speedDifference;
     const tmpDirPath = path.join(__dirname, `../tmp/${uuid()}`);
@@ -27,33 +25,14 @@ const onUpdateArticleVideoSpeed = channel => (msg) => {
     // uploaded cutted parts
     // cleanup
     // channel.ack(msg);
-    console.log('=========== onUpdateArticleVideoSpeed ====================', articleId, videoSpeed)
-    articleService.findById(articleId)
-        .then((a) => {
-            if (!a) throw new Error('Invalid article id');
+    console.log('=========== onUpdateArticleVideoSpeed ====================', id, videoSpeed)
+    speedDifference = videoSpeed - 1;
+    // Use original article to get fresh media
+    subslides = originalSlides.slice()
+        .reduce((acc, s) => s.content && s.content.length > 0 ? acc.concat(s.content.map((ss) => ({ ...ss, slidePosition: s.position, subslidePosition: ss.position }))) : acc, []).sort((a, b) => a.startTime - b.startTime);
 
-            article = a;
-            return articleService.findById(a.originalArticle)
-        })
-        .then(o => {
-            article.originalArticle = o;
-            return videoService.findById(article.video) 
-        })
-        .then(v => {
-            article.video = v;
-            return Promise.resolve(article);
-        })
-        // Download media
-        .then(() => {
-            originalArticle = article.originalArticle;
-            speedDifference = videoSpeed - 1;
-            // Use original article to get fresh media
-            subslides = originalArticle.slides.slice()
-                .reduce((acc, s) => s.content && s.content.length > 0 ? acc.concat(s.content.map((ss) => ({ ...ss, slidePosition: s.position, subslidePosition: ss.position }))) : acc, []).sort((a, b) => a.startTime - b.startTime);
-
-            videoPath = path.join(tmpDirPath, `original-video-${uuid()}.${utils.getFileExtension(article.video.url)}`);
-            return utils.downloadFile(article.video.url, videoPath)
-        })
+    videoPath = path.join(tmpDirPath, `original-video-${uuid()}.${utils.getFileExtension(videoUrl)}`);
+    utils.downloadFile(videoUrl, videoPath)
         // Cut video to slides
         .then(() => converter.cutSubslidesIntoVideos(subslides, videoPath, tmpDirPath))
         // Change start/end timings
@@ -119,19 +98,12 @@ const onUpdateArticleVideoSpeed = channel => (msg) => {
             console.log('speed original video');
             return new Promise((resolve, reject) => {
 
-                const speededVideoPath = path.join(tmpDirPath, `speeded-original-video-${uuid()}.${utils.getFileExtension(article.video.url)}`);
+                const speededVideoPath = path.join(tmpDirPath, `speeded-original-video-${uuid()}.${utils.getFileExtension(videoUrl)}`);
                 converter.speedVideo(videoPath, speededVideoPath, videoSpeed)
                 .then(() => {
                     return resolve({ subslides, videoPath: speededVideoPath })
                 })
                 .catch(reject)
-                // converter.combineVideos(subslides.sort((a, b) => a.startTime - b.startTime).map((s) => ({ fileName: s.video })), {
-                //     onProgress: prog => console.log(prog),
-                //     onEnd: (err, videoPath) => {
-                //         if (err) return reject(err);
-                //         return resolve({ subslides, videoPath })
-                //     }
-                // })
             })
         })
         .then(({ subslides, videoPath }) => {
@@ -198,10 +170,10 @@ const onUpdateArticleVideoSpeed = channel => (msg) => {
                     slidesUpdate[`${updateField}.videoSpeed`] = videoSpeed;
                 }
             })
-            console.log('slide updates', slidesUpdate);
-            return articleService.updateById(articleId, slidesUpdate)
-        })
-        .then(() => {
+            channel.sendToQueue(queues.UPDATE_ARTICLE_VIDEO_SPEED_FINISH, new Buffer(JSON.stringify({
+                id,
+                slidesUpdate,
+            })), { persistent: true })
             console.log('done updating');
             channel.ack(msg);
             utils.cleanupDir(tmpDirPath)
@@ -210,13 +182,10 @@ const onUpdateArticleVideoSpeed = channel => (msg) => {
             console.log(err);
             console.log('====================')
             utils.cleanupDir(tmpDirPath);
-            articleService.updateById(articleId, { videoSpeedLoading: false })
-                .then(() => {
-
-                })
-                .catch(err => {
-                    console.log(err);
-                })
+            channel.sendToQueue(queues.UPDATE_ARTICLE_VIDEO_SPEED_FINISH, new Buffer(JSON.stringify({
+                id,
+                status: 'failed',
+            })), { persistent: true })
             channel.ack(msg);
         })
 }
