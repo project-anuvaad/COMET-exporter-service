@@ -4,7 +4,6 @@ const fs = require('fs');
 
 const { 
     storageService,
-    translationExportService,
 } = require('../services');
 
 const queues = require('../constants').queues;
@@ -73,7 +72,6 @@ const onGenerateVideoSubtitles = channel => msg => {
             const videoName = `${dir || uuid()}/${langCode ||langName}_${title}-with-subtitlesUtils.${videoPath.split('.').pop()}`;
             storageService.saveFile('subtitled_videos', videoName, fs.createReadStream(subtitledVideoPath))
                 .then((uploadRes) => {
-                    // return translationExportService.updateById(id, { subtitledVideoUrl: uploadRes.url, subtitledVideoProgress: 100, subtitledSignlanguageVideoProgress: 50 });
                     updateTranslationExportSubtitledVideoFinish(channel, { id, url: uploadRes.url });
                     return resolve(subtitledVideoPath);
                 })
@@ -132,8 +130,7 @@ const onGenerateVideoSubtitles = channel => msg => {
         utils.cleanupDir(tmpDirPath)
         console.log(err, ' error from catch');
         channel.ack(msg);
-        channel.sendToQueue(queues.BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_AND_SIGNLANGUAGE_FINISH, new Buffer(JSON.stringify({ id })), { persistent: true });
-        translationExportService.updateById(id, { subtitledSignlanguageVideoProgress: 0 }).then(() => { });
+        channel.sendToQueue(queues.BURN_ARTICLE_TRANSLATION_VIDEO_SUBTITLE_AND_SIGNLANGUAGE_FINISH, new Buffer(JSON.stringify({ id, status: 'failed' })), { persistent: true });
     })
 }
 

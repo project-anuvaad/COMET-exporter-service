@@ -60,49 +60,8 @@ const onExportArticleTranslation = channel => msg => {
 
     originalSubslides = originalSlides.slice()
         .reduce((acc, s) => s.content && s.content.length > 0 ? acc.concat(s.content.map((ss) => ({ ...ss, slidePosition: s.position, subslidePosition: ss.position }))) : acc, []).sort((a, b) => a.startTime - b.startTime);
-    // translationExportService.findById(id)
-    //     .then((te) => {
-    //         if (!te) {
-    //             throw new Error('Invalid translation export id')
-    //         }
-    //         translationExport = te;
-    //         return articleService.findById(te.article)
-    //     })
-    //     .then(a => {
-    //         translationExport.article = a;
-    //         article = translationExport.article;
-    //         slides.sort((a, b) => a.positon - b.position).forEach(slide => {
-    //             slide.content.sort((a, b) => a.position - b.position).forEach((subslide) => {
-    //                 allSubslides.push({ ...subslide, slidePosition: slide.position, subslidePosition: subslide.position });
-    //             })
-    //         });
-    //         allSubslides = allSubslides.sort((a, b) => a.startTime - b.startTime).map((s,index) => ({ ...s, position: index }));
-
-    //         return videoService.findById(translationExport.video)
-    //     })
-    //     .then(v => {
-    //         translationExport.video = v;
-    //         video = translationExport.video;
-    //         originalVideoPath = path.join(tmpDirPath, `original-video-${uuid()}.${videoUrl.split('.').pop()}`)
-    //         return new Promise((resolve, reject) => {
-    //             console.log('Downloading original video');
-    //             const videoUrl = videoUrl;
-    //             utils.downloadFile(videoUrl, originalVideoPath)
-    //             .then(() => {
-    //                 resolve()
-    //             })
-    //             .catch(reject);
-    //         })
-    //     })
+  
         utils.downloadFile(videoUrl, originalVideoPath)
-        // .then(() => {
-        //     return articleService.findById(article.originalArticle)
-        // })
-        // .then(originalArticle => {
-        //     originalSubslides = originalSlides.slice()
-        //         .reduce((acc, s) => s.content && s.content.length > 0 ? acc.concat(s.content.map((ss) => ({ ...ss, slidePosition: s.position, subslidePosition: ss.position }))) : acc, []).sort((a, b) => a.startTime - b.startTime);
-        //     return Promise.resolve();
-        // })
         // if any slide has different video speed, adjust the speed in the original video
         .then(() => {
             updateTranslationExportProgress(channel, id, 5)

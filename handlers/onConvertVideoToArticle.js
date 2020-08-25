@@ -130,18 +130,6 @@ const onConvertVideoToArticle = (channel) => (msg) => {
           subslide.position = index;
         });
       });
-      //   return articleService.updateById(article._id, {
-      //     slides: modifiedSlides,
-      //     converted: true,
-      //   });
-      // })
-      // .then(() => {
-      //   return videoService.updateById(videoId, {
-      //     status: "done",
-      //     article: articleId,
-      //   });
-      // })
-      // .then(() => {
       console.log("done");
       utils.cleanupFiles(tmpFiles);
       channel.ack(msg);

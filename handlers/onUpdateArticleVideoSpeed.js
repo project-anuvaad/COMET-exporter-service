@@ -8,7 +8,6 @@ const converter = require('../converter');
 
 const {
     storageService,
-    articleService,
 } = require('../services');
 const { queues } = require('../constants');
 
