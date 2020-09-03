@@ -1030,12 +1030,12 @@ function overlayVideosOnVideo(videos, originalViedo, targetVideoPath) {
 function compressVideo(videoPath, targetPath) {
   return new Promise((resolve, reject) => {
     // Try first to scale the video to 480p
-    exec(`ffmepg -loglevel panic -i ${videoPath} -filter:v scale=480:-1 -c:a copy ${targetPath}`, (err) => {
+    exec(`ffmepg -loglevel error -y -i ${videoPath} -filter:v scale=480:-1 -c:a copy ${targetPath}`, (err) => {
       if (err) {
-        console.log('error resizing video to 480p')
+        console.log('error resizing video to 480p', err)
         // If that didnt work
         // By default, ffmpeg applies compression of videos
-        const cmd = `ffmpeg -loglevel error -i ${videoPath} ${targetPath}`;
+        const cmd = `ffmpeg -loglevel error -y -i ${videoPath} ${targetPath}`;
         exec(cmd, (err) => {
           if (err) return reject(err);
           return resolve(targetPath);
