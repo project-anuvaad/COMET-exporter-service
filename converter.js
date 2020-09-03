@@ -14,9 +14,9 @@ const { getRemoteFileDuration } = require("./utils");
 
 function cutVideo(videoPath, targetPath, start, duration) {
   return new Promise((resolve, reject) => {
-    const command = `ffmpeg -loglevel warning -y -ss ${utils.formatCutTime(
+    const command = `ffmpeg -loglevel error -y -ss ${utils.formatCutTime(
       start
-    )} -i ${videoPath} -t ${duration} ${targetPath}`;
+    )} -i ${videoPath} -t ${parseFloat(duration).toFixed(3)} ${targetPath}`;
     exec(command, (err) => {
       if (err) return reject(err);
       if (!fs.existsSync(targetPath))
@@ -55,7 +55,7 @@ function getAudioMonoOrStereo(audioPath) {
 function normalizeAudio(audioPath, targetPath) {
   return new Promise((resolve, reject) => {
     const commands = {
-      mono: `ffmpeg -loglevel warning -i ${audioPath} -af "anoisesrc=a=0.5:d=9:c=pink:r=48000,aformat=channel_layouts=mono[pad];
+      mono: `ffmpeg -loglevel error -i ${audioPath} -af "anoisesrc=a=0.5:d=9:c=pink:r=48000,aformat=channel_layouts=mono[pad];
                     [pad][in]concat=n=2:v=0:a=1,
                      bass=g=+10:f=150:t=q:w=0.5,
                      treble=g=+12:f=6500:t=q,
@@ -64,7 +64,7 @@ function normalizeAudio(audioPath, targetPath) {
                      asetpts=PTS-STARTPTS,
                      aresample=48000,
                      adeclick" ${targetPath}`,
-      stereo: `ffmpeg -loglevel warning -i ${audioPath} -af "anoisesrc=a=0.5:d=9:c=pink:r=48000,aformat=channel_layouts=stereo[pad];
+      stereo: `ffmpeg -loglevel error -i ${audioPath} -af "anoisesrc=a=0.5:d=9:c=pink:r=48000,aformat=channel_layouts=stereo[pad];
                     [pad][in]concat=n=2:v=0:a=1,
                      bass=g=+10:f=150:t=q:w=0.5,
                      treble=g=+12:f=6500:t=q,
@@ -128,7 +128,7 @@ function extractAudioFromVideoPart(videoPath, targetPath, startTime, duration) {
 
 function extractAudioFromVideo(videoPath, targetPath) {
   return new Promise((resolve, reject) => {
-    const command = `ffmpeg -loglevel warning -y -i ${videoPath} -map 0:a:0 ${targetPath}`;
+    const command = `ffmpeg -loglevel error -y -i ${videoPath} -map 0:a:0 ${targetPath}`;
     exec(command, (err) => {
       if (err) return reject(err);
       if (!fs.existsSync(targetPath))
@@ -255,7 +255,7 @@ function convertSlidesTextToSpeach(lang, speakersProfile, slidesArray) {
 function slowAudio(audioPath, targetPath, atempoRatio) {
   return new Promise((resolve, reject) => {
     exec(
-      `ffmpeg -loglevel warning -i ${audioPath} -filter:a "atempo=${atempoRatio}" -vn ${targetPath}`,
+      `ffmpeg -loglevel error -i ${audioPath} -filter:a "atempo=${atempoRatio}" -vn ${targetPath}`,
       (err) => {
         if (err) return reject(err);
         return resolve(targetPath);
@@ -335,7 +335,7 @@ function matchSlidesAudioWithVideoDuration(slides) {
 
 function addAudioToVideo(videoPath, audioPath, outPath) {
   return new Promise((resolve, reject) => {
-    const cmd = `ffmpeg -loglevel warning -i ${videoPath} -i ${audioPath} -map 0:v:0? -map 1:a:0 -c:v copy ${outPath}`;
+    const cmd = `ffmpeg -loglevel error -i ${videoPath} -i ${audioPath} -map 0:v:0? -map 1:a:0 -c:v copy ${outPath}`;
     // const cmd = `ffmpeg -i ${videoPath} -i ${audioPath} -map 0:v:0 -map 1:a:0 ${outPath}`;
     exec(cmd, (err) => {
       if (err) {
@@ -363,15 +363,13 @@ function overlayAudioOnVideo(videoPath, audioPath, volume, outPath) {
     utils
       .getRemoteFileDuration(videoPath)
       .then((videoDuration) => {
-        console.log("video duration is", videoDuration);
         // Loop the audio file till the end of video duration
         // add audio over the video
-        const cmd = `ffmpeg -loglevel warning -i ${videoPath} -stream_loop -1 -t ${parseFloat(
+        const cmd = `ffmpeg -loglevel error -i ${videoPath} -stream_loop -1 -t ${parseFloat(
           videoDuration
         ).toFixed(
           2
         )} -i ${audioPath} -filter_complex "[1:a]volume=${volume}[a];[a][0:a]amix=inputs=2:duration=longest:dropout_transition=3[a]" -map 0:v -map "[a]" -c:v copy ${outPath}`;
-        console.log(cmd);
         // const cmd = `ffmpeg -i ${videoPath} -i ${audioPath} -filter_complex "[0:a][1:a]amerge=inputs=2[a]" -map 0:v -map "[a]" -c:v copy ${outPath}`;
         // const cmd = `ffmpeg -i ${videoPath} -i ${audioPath} -map 0 -map 1 -codec copy ${outPath}`;
         exec(cmd, (err) => {
@@ -392,7 +390,7 @@ function overlayAudioOnVideo(videoPath, audioPath, volume, outPath) {
 
 function addSilenceToVideo(videoPath, outPath) {
   return new Promise((resolve, reject) => {
-    const cmd = `ffmpeg -loglevel warning -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -i ${videoPath} -shortest -c:v copy -c:a aac ${outPath}`;
+    const cmd = `ffmpeg -loglevel error -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -i ${videoPath} -shortest -c:v copy -c:a aac ${outPath}`;
     exec(cmd, (err) => {
       if (err) return reject(err);
       return resolve(outPath);
@@ -408,7 +406,7 @@ function fadeAudio(filePath, type, { fadeDuration, durationType }, outPath) {
         .then((duration) => {
           if (!duration) return reject(new Error("Cannot get file duration"));
           const finalFadeDuration = (fadeDuration * duration) / 100;
-          let command = `ffmpeg -loglevel warning -i ${filePath}`;
+          let command = `ffmpeg -loglevel error -i ${filePath}`;
           if (["in", "out"].indexOf(type) !== -1) {
             command += ` -af "afade=t=${type}:st=${
               type === "in" ? "0" : duration - finalFadeDuration
@@ -433,7 +431,7 @@ function fadeAudio(filePath, type, { fadeDuration, durationType }, outPath) {
         .catch(reject);
     } else {
       exec(
-        `ffmpeg -loglevel warning -i ${filePath} -af "afade=t=${type}:st=0:d=${fadeDuration}" ${outPath}`,
+        `ffmpeg -loglevel error -i ${filePath} -af "afade=t=${type}:st=0:d=${fadeDuration}" ${outPath}`,
         (err) => {
           if (err) return reject(err);
           return resolve(outPath);
@@ -469,7 +467,7 @@ function speedVideo(videoPath, outputPath, speed) {
     if (audioSpeedFactor < 0.5) {
       audioSpeedFactor = 0.5;
     }
-    const cmd = `ffmpeg -loglevel warning -i ${videoPath} -filter:v "setpts=${parseFloat(
+    const cmd = `ffmpeg -loglevel error -i ${videoPath} -filter:v "setpts=${parseFloat(
       videoSpeedFactor
     ).toFixed(2)}*PTS" ${outputPath}`;
     // const cmd = `ffmpeg -i ${videoPath} -filter:v "setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*PTS" ${outputPath}`
@@ -494,7 +492,7 @@ function speedVideoPart(videoPath, outputPath, speed, startTime, endTime){
     if (audioSpeedFactor < 0.5) {
       audioSpeedFactor = 0.5;
     }
-    const cmd = `ffmpeg -loglevel warning -y -i ${videoPath} -filter_complex "[0:v]trim=0:${startTime},setpts=PTS-STARTPTS[v1];[0:v]trim=${startTime}:${endTime},setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*(PTS-STARTPTS)[v2];[0:v]trim=${endTime},setpts=PTS-STARTPTS[v3];[v1][v2][v3]concat=n=3:v=1" -preset superfast -profile:v baseline ${outputPath}`;
+    const cmd = `ffmpeg -loglevel error -y -i ${videoPath} -filter_complex "[0:v]trim=0:${startTime},setpts=PTS-STARTPTS[v1];[0:v]trim=${startTime}:${endTime},setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*(PTS-STARTPTS)[v2];[0:v]trim=${endTime},setpts=PTS-STARTPTS[v3];[v1][v2][v3]concat=n=3:v=1" -preset superfast -profile:v baseline ${outputPath}`;
     // const cmd = `ffmpeg -i ${videoPath} -filter:v "setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*PTS" ${outputPath}`
     exec(cmd, (err) => {
       if (err) return reject(err);
@@ -517,9 +515,8 @@ function speedVideoAndAudioPart(videoPath, outputPath, speed, startTime, endTime
     if (audioSpeedFactor < 0.5) {
       audioSpeedFactor = 0.5;
     }
-    const cmd = `ffmpeg -loglevel warning -y -i ${videoPath} -filter_complex "[0:v]trim=0:${startTime},setpts=PTS-STARTPTS[v1];[0:v]trim=${startTime}:${endTime},setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*(PTS-STARTPTS)[v2];[0:v]trim=${endTime},setpts=PTS-STARTPTS[v3];[0:a]atrim=0:${startTime},asetpts=PTS-STARTPTS[a1];[0:a]atrim=${startTime}:${endTime},asetpts=PTS-STARTPTS,atempo=${audioSpeedFactor}[a2];[0:a]atrim=${endTime},asetpts=PTS-STARTPTS[a3];[v1][a1][v2][a2][v3][a3]concat=n=3:v=1:a=1" ${outputPath}`;
+    const cmd = `ffmpeg -loglevel error -y -i ${videoPath} -filter_complex "[0:v]trim=0:${startTime},setpts=PTS-STARTPTS[v1];[0:v]trim=${startTime}:${endTime},setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*(PTS-STARTPTS)[v2];[0:v]trim=${endTime},setpts=PTS-STARTPTS[v3];[0:a]atrim=0:${startTime},asetpts=PTS-STARTPTS[a1];[0:a]atrim=${startTime}:${endTime},asetpts=PTS-STARTPTS,atempo=${audioSpeedFactor}[a2];[0:a]atrim=${endTime},asetpts=PTS-STARTPTS[a3];[v1][a1][v2][a2][v3][a3]concat=n=3:v=1:a=1" ${outputPath}`;
     console.log('speeding video part')
-    console.log(cmd)
     // const cmd = `ffmpeg -i ${videoPath} -filter:v "setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*PTS" ${outputPath}`
     exec(cmd, (err) => {
       if (err) return reject(err);
@@ -579,7 +576,6 @@ function speedVideoAndAudioParts(videoPath, outputPath, parts) {
             }
         }
       })
-      console.log(newParts)
       let videoFilter = ``
       let audioFilter = ``
       newParts.forEach((part, index) => {
@@ -605,7 +601,6 @@ function speedVideoAndAudioParts(videoPath, outputPath, parts) {
 
       // const cmd = `ffmpeg -y -i ${videoPath} -filter_complex "[0:v]trim=0:${startTime},setpts=PTS-STARTPTS[v1];[0:v]trim=${startTime}:${endTime},setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*(PTS-STARTPTS)[v2];[0:v]trim=${endTime},setpts=PTS-STARTPTS[v3];[0:a]atrim=0:${startTime},asetpts=PTS-STARTPTS[a1];[0:a]atrim=${startTime}:${endTime},asetpts=PTS-STARTPTS,atempo=${audioSpeedFactor}[a2];[0:a]atrim=${endTime},asetpts=PTS-STARTPTS[a3];[v1][a1][v2][a2][v3][a3]concat=n=3:v=1:a=1" ${outputPath}`;
       console.log('speeding video part')
-      console.log(cmd)
       // const cmd = `ffmpeg -i ${videoPath} -filter:v "setpts=${parseFloat(videoSpeedFactor).toFixed(2)}*PTS" ${outputPath}`
       exec(cmd, (err) => {
         if (err) return reject(err);
@@ -654,14 +649,12 @@ function combineVideos(videos, { onProgress = () => { }, onEnd = () => { } }) {
           if (err) {
             totalDuration = 0;
           }
-          console.log("got total duration", totalDuration);
 
           const command = `ffmpeg ${fileNames} \
             -filter_complex "${filterComplex}concat=n=${videos.length}:v=1:a=1[outv][outa]" \
             -map "[outv]" -map "[outa]" ${videoPath}`;
           // const command = `ffmpeg -y -f concat -safe 0 -i ${listName}.txt -c copy ${videoPath}`;
           exec(command, { maxBuffer: 1024 * 1024 * 1024 }, (err) => {
-            console.log("command finihsed");
             if (err) {
               onEnd(err);
             } else {
@@ -719,7 +712,7 @@ function combineAudios(
 function generateSilentFile(filePath, duration) {
   return new Promise((resolve, reject) => {
     exec(
-      `ffmpeg -loglevel warning -f lavfi -i anullsrc=channel_layout=5.1:sample_rate=48000 -t ${duration} ${filePath}`,
+      `ffmpeg -loglevel error -f lavfi -i anullsrc=channel_layout=5.1:sample_rate=48000 -t ${duration} ${filePath}`,
       (err) => {
         if (err) return reject(err);
         return resolve(filePath);
@@ -768,12 +761,6 @@ function extendAudioDuration(audioPath, targetPath, targetDuration) {
         if (!duration) throw new Error("Invalid audio file");
         audioDuration = duration;
         durationDifference = targetDuration - audioDuration;
-        console.log(
-          "difference",
-          audioDuration,
-          targetDuration,
-          durationDifference
-        );
         if (durationDifference <= 0) {
           return slowAudioToDuration(audioPath, targetDuration)
           .then((newAudioPath) => { 
@@ -801,7 +788,7 @@ function convertToMp3(filePath) {
     let fileName = filePath.split(".");
     fileName.pop();
     fileName = fileName.join(".");
-    const command = `ffmpeg -loglevel warning -i ${filePath} -acodec libmp3lame ${fileName}.mp3`;
+    const command = `ffmpeg -loglevel error -i ${filePath} -acodec libmp3lame ${fileName}.mp3`;
     exec(command, (err) => {
       if (err) return reject(err);
       return resolve(`${fileName}.mp3`);
@@ -811,7 +798,7 @@ function convertToMp3(filePath) {
 
 function changeAudioVolume(filePath, outPath, volume) {
   return new Promise((resolve, reject) => {
-    const command = `ffmpeg -loglevel warning -i ${filePath} -af "volume=${volume}" ${outPath}`;
+    const command = `ffmpeg -loglevel error -i ${filePath} -af "volume=${volume}" ${outPath}`;
     exec(command, (err) => {
       if (err) return reject(err);
       return resolve(outPath);
@@ -824,7 +811,7 @@ function changeExtension(filePath, from, to) {
     let fileName = filePath.split(".");
     fileName.pop();
     fileName = fileName.join(".");
-    const command = `ffmpeg -loglevel warning -i ${filePath} ${fileName}.${to}`;
+    const command = `ffmpeg -loglevel error -i ${filePath} ${fileName}.${to}`;
     exec(command, (err) => {
       console.log("change done", err);
       if (err) return reject(err);
@@ -891,7 +878,7 @@ function burnSubtitlesToVideo(
 
 function generateThumbnailFromVideo(videoPath, thumbnailPath, thumbnailTime) {
   return new Promise((resolve, reject) => {
-    const cmd = `ffmpeg -loglevel warning -i ${videoPath} -ss ${thumbnailTime} -vframes 1 ${thumbnailPath}`;
+    const cmd = `ffmpeg -loglevel error -i ${videoPath} -ss ${thumbnailTime} -vframes 1 ${thumbnailPath}`;
     exec(cmd, (err) => {
       if (err) return reject(err);
       return resolve(thumbnailPath);
@@ -932,7 +919,6 @@ function getVideoDuration(videoPath) {
     exec(
       `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 ${videoPath}`,
       (err, stdout) => {
-        console.log("video duration ====================", err, stdout);
         if (err) return reject(err);
         return resolve(parseFloat(stdout.replace("\n", "")).toFixed(3));
       }
@@ -993,7 +979,7 @@ function overlayVideosOnVideo(videos, originalViedo, targetVideoPath) {
 
             async.parallelLimit(normalizeExtensionFunArray, 2, (err) => {
               if (err) return reject(err);
-              let cmd = `ffmpeg -loglevel warning -y -i ${originalViedo}`;
+              let cmd = `ffmpeg -loglevel error -y -i ${originalViedo}`;
               let inputs = "";
               let scales = "";
               let overlays = "";
@@ -1027,7 +1013,6 @@ function overlayVideosOnVideo(videos, originalViedo, targetVideoPath) {
               });
               // ffmpeg -y -i original.mp4 -i overflow.mp4 -i overflow.mp4 -filter_complex "[1:v]scale=(1920/4):-1[overlayscaled1];[2:v]scale=(1920/4):-1[overlayscaled2];[0:v][overlayscaled1]overlay=(W-w):(H-h):enable='between(t,0,2)'[outv];[outv][overlayscaled2]overlay=0:0:enable='between(t,0,4)'[outv]" -map "[outv]" -map "0:a" output.mp4
               cmd = `${cmd}${inputs} -filter_complex "${delaystart};${scales};${overlays}" -map "[outv]" -map "0:a" -t ${duration} ${targetVideoPath}`;
-              console.log("command is", cmd);
               exec(cmd, (err) => {
                 console.log("done overlaying videos");
                 utils.cleanupFiles(tmpFiles);
@@ -1044,12 +1029,21 @@ function overlayVideosOnVideo(videos, originalViedo, targetVideoPath) {
 
 function compressVideo(videoPath, targetPath) {
   return new Promise((resolve, reject) => {
-    // By default, ffmpeg applies compression of videos
-    const cmd = `ffmpeg -loglevel warning -i ${videoPath} ${targetPath}`;
-    exec(cmd, (err) => {
-      if (err) return reject(err);
-      return resolve(targetPath);
-    });
+    // Try first to scale the video to 480p
+    exec(`ffmepg -loglevel panic -i ${videoPath} -filter:v scale=480:-1 -c:a copy ${targetPath}`, (err) => {
+      if (err) {
+        console.log('error resizing video to 480p')
+        // If that didnt work
+        // By default, ffmpeg applies compression of videos
+        const cmd = `ffmpeg -loglevel error -i ${videoPath} ${targetPath}`;
+        exec(cmd, (err) => {
+          if (err) return reject(err);
+          return resolve(targetPath);
+        });
+      } else {
+        return resolve(targetPath);
+      }
+    })
   });
 }
 
