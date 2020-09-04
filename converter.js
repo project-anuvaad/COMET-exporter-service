@@ -1030,7 +1030,7 @@ function overlayVideosOnVideo(videos, originalViedo, targetVideoPath) {
 function compressVideo(videoPath, targetPath) {
   return new Promise((resolve, reject) => {
     // Try first to scale the video to 480p
-    exec(`ffmpeg -loglevel error -y -i ${videoPath} -filter:v scale=480:-1 -c:a copy ${targetPath}`, (err) => {
+    exec(`ffmpeg -loglevel error -y -i ${videoPath} -filter:v scale=480:360 -c:a copy ${targetPath}`, (err) => {
       if (err) {
         console.log('error resizing video to 480p', err)
         // If that didnt work
