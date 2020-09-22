@@ -21,6 +21,10 @@ const onGenerateVideoSubtitles = channel => msg => {
     const assSubtitlePath = path.join(tmpDirPath, `subtitles-${uuid()}.ass`);
     let videoPath;
     fs.mkdirSync(tmpDirPath);
+    if (!videoUrl) {
+        updateTranslationExportSubtitledVideoProgress(channel, id, 0)
+        return channel.ack(msg); 
+    }
     videoPath = path.join(tmpDirPath, `video-${uuid()}.${videoUrl.split('.').pop()}`);
         utils.downloadFile(videoUrl, videoPath)
         .then(() => {
