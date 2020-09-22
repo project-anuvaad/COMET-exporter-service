@@ -12,7 +12,9 @@ const onConvertVideoToArticle = (channel) => (msg) => {
   const { id, videoUrl } = JSON.parse(msg.content.toString());
   let tmpFiles = [];
   let video;
+  let videoDuration;
   let videoPath;
+  let thumbnailUrl = '';
   // download original video
   // cut it using the timing provided by the user
   // cut silent parts and add them as slides
@@ -47,12 +49,11 @@ const onConvertVideoToArticle = (channel) => (msg) => {
     })
     .then(() => {
       tmpFiles.push(thumbnailPath);
-      console.log("Compressing video");
-      return converter.compressVideo(videoPath, compressedVideoPath);
+      return utils.getRemoteFileDuration(videoPath)
     })
-    .then(() => {
+    .then((duration) => {
+      videoDuration = parseFloat(duration).toFixed(3);
       console.log("saving thumbnail Image");
-      tmpFiles.push(compressedVideoPath);
       return storageService.saveFile(
         "thumbnails",
         thumbnailPath.split("/").pop(),
@@ -60,10 +61,13 @@ const onConvertVideoToArticle = (channel) => (msg) => {
       );
     })
     .then((uploadRes) => {
-      channel.sendToQueue(queues.GENERATE_VIDEO_THUMBNAIL_FINISH, new Buffer(JSON.stringify({ id, url: uploadRes.url })), { persistent: true });
-      return Promise.resolve();
+      thumbnailUrl = uploadRes.url;
+      channel.sendToQueue(queues.GENERATE_VIDEO_THUMBNAIL_FINISH, new Buffer(JSON.stringify({ id, url: uploadRes.url, duration: videoDuration })), { persistent: true });
+      console.log("Compressing video");
+      return converter.compressVideo(videoPath, compressedVideoPath);
     })
     .then(() => {
+      tmpFiles.push(compressedVideoPath);
       return storageService.saveFile(
         "compressed_videos",
         compressedVideoPath.split("/").pop(),
@@ -80,6 +84,7 @@ const onConvertVideoToArticle = (channel) => (msg) => {
       channel.ack(msg);
     })
     .catch((err) => {
+      channel.sendToQueue(queues.GENERATE_VIDEO_THUMBNAIL_FINISH, new Buffer(JSON.stringify({ id, url: thumbnailUrl, duration: videoDuration })), { persistent: true });
       console.log(err);
       utils.cleanupFiles(tmpFiles);
       channel.ack(msg);
