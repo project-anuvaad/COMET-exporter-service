@@ -1,5 +1,5 @@
-const storageService = require('@videowiki/vendors/storage');
-const textToSpeechService = require('@videowiki/vendors/textToSpeech') 
+const storageService = require('@comet-anuvaad/vendors/storage');
+const textToSpeechService = require('@comet-anuvaad/vendors/textToSpeech') 
 
 module.exports = {
     storageService,
