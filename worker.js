@@ -3,7 +3,7 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 
 const RABBITMQ_SERVER = process.env.RABBITMQ_SERVER;
-const videowikiGenerators = require('@videowiki/generators')
+const generators = require('@comet-anuvaad/generators')
 const rabbitmqService = require('./vendors/rabbitmq');
 const { queues } = require('./constants');
 const {
@@ -52,7 +52,7 @@ let channel;
 rabbitmqService.createChannel(RABBITMQ_SERVER, (err, ch) => {
     if (err) throw err;
     channel = ch;
-    const { server, app } = videowikiGenerators.serverGenerator({ uploadLimit: 50 });
+    const { server, app } = generators.serverGenerator({ uploadLimit: 50 });
 
     channel.on('error', (err) => {
         console.log('RABBITMQ ERROR', err)
@@ -63,7 +63,7 @@ rabbitmqService.createChannel(RABBITMQ_SERVER, (err, ch) => {
         process.exit(1);
     })
 
-    videowikiGenerators.healthcheckRouteGenerator({ router: app, rabbitmqConnection: channel.connection });
+    generators.healthcheckRouteGenerator({ router: app, rabbitmqConnection: channel.connection });
     server.listen(4000);
 
     channel.prefetch(1)
