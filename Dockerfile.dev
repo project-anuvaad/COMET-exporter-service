@@ -1,4 +1,4 @@
-FROM hassanamin994/node_ffmpeg:6
+FROM anuvaadio/node_ffmpeg:6
 WORKDIR /exporter-service
 
 COPY . .
